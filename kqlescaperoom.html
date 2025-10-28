@@ -378,7 +378,7 @@
   <div class="pill" role="group" aria-label="App controls">
     <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light theme">🌓</button>
     <button class="ghost" id="exportBtn" onclick="exportCSV()" aria-label="Export leaderboard to CSV">Export CSV</button>
-    <button class="ghost" id="resetBtn" onclick="resetAllForceReload()" aria-label="Reset all data">Reset</button>
+    <button class="ghost" id="resetBtn" onclick="nuclearReset()" aria-label="Reset all data">Reset</button>
   </div>
 </header>
 
@@ -605,15 +605,28 @@ var state = {
 var isResetting = false;
 
 // Load state with error handling
-try { 
-  const saved = localStorage.getItem(LSKEY);
-  if (saved) {
-    const parsed = JSON.parse(saved);
-    state = { ...state, ...parsed };
+// Check if this is a reset reload
+var isResetReload = Q.has('reset');
+
+if (isResetReload) {
+  console.log("Reset reload detected, skipping state restoration");
+  // Clear the reset parameter from URL
+  if (history.replaceState) {
+    const url = new URL(window.location);
+    url.searchParams.delete('reset');
+    history.replaceState({}, '', url);
   }
-} catch(e) { 
-  console.warn("Failed to load saved state:", e);
-  state = { answers: {}, host: false, board: [], team: "", startTs: null, attempts: {}, facilitatorAttempts: 0, facilitatorLocked: false };
+} else {
+  try { 
+    const saved = localStorage.getItem(LSKEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      state = { ...state, ...parsed };
+    }
+  } catch(e) { 
+    console.warn("Failed to load saved state:", e);
+    state = { answers: {}, host: false, board: [], team: "", startTs: null, attempts: {}, facilitatorAttempts: 0, facilitatorLocked: false };
+  }
 }
 
 /* ======== ENHANCED HELPERS ======== */
@@ -1331,6 +1344,58 @@ function resetAll(){
   }, 1000);
 }
 
+// Nuclear reset function - clears everything possible
+function nuclearReset(){
+  var message = "NUCLEAR RESET - This will:\n" +
+                "• Clear ALL localStorage data\n" +
+                "• Clear ALL sessionStorage data\n" +
+                "• Clear ALL cookies\n" +
+                "• Force a hard page reload\n\n" +
+                "This is the most thorough reset possible.\n\n" +
+                "Are you absolutely sure?";
+                
+  if(!confirm(message)) return;
+  
+  console.log("Starting NUCLEAR reset...");
+  
+  try {
+    // Clear localStorage completely
+    localStorage.clear();
+    
+    // Clear sessionStorage completely  
+    sessionStorage.clear();
+    
+    // Clear all cookies
+    document.cookie.split(";").forEach(function(c) { 
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+    });
+    
+    console.log("All storage cleared");
+  } catch(e) {
+    console.error("Error during nuclear clear:", e);
+  }
+  
+  showStatus("NUCLEAR RESET: Clearing everything...", 'error');
+  
+  // Force hard reload with cache bypass
+  setTimeout(() => {
+    console.log("Executing nuclear reload...");
+    window.location.replace(window.location.href.split('?')[0] + '?nuclear=' + Date.now());
+  }, 1000);
+}
+
+// Handle nuclear reset parameter
+var isNuclearReset = Q.has('nuclear');
+if (isNuclearReset) {
+  console.log("Nuclear reset detected");
+  // Clear the nuclear parameter
+  if (history.replaceState) {
+    const url = new URL(window.location);
+    url.searchParams.delete('nuclear');
+    history.replaceState({}, '', url);
+  }
+}
+
 // Alternative reset function that forces page reload (more reliable for GitHub Pages)
 function resetAllForceReload(){
   var message = "This will clear ALL data and reload the page:\n" +
@@ -1344,24 +1409,71 @@ function resetAllForceReload(){
   
   console.log("Starting force reset with reload...");
   
-  // Clear all localStorage data
+  // Clear all localStorage data multiple times to ensure it's gone
   try {
+    // Clear multiple times to be sure
     localStorage.removeItem(LSKEY);
     localStorage.removeItem('kql-escape-theme');
-    console.log("localStorage cleared");
+    
+    // Also clear any other potential keys
+    localStorage.removeItem('kql-escape-shared-v1');
+    localStorage.removeItem('kql-escape-shared-v2');
+    localStorage.removeItem('kql-escape-theme');
+    
+    // Clear all localStorage if possible
+    localStorage.clear();
+    
+    console.log("localStorage cleared completely");
+    
+    // Verify it's actually cleared
+    const remainingData = localStorage.getItem(LSKEY);
+    if (remainingData) {
+      console.error("localStorage still contains data after clear:", remainingData);
+    } else {
+      console.log("localStorage verification: cleared successfully");
+    }
+    
   } catch(e) {
     console.error("Error clearing localStorage:", e);
   }
   
   showStatus("Clearing data and reloading...", 'info');
   
-  // Force reload after a short delay
+  // Force reload after a longer delay to ensure localStorage is cleared
   setTimeout(() => {
-    location.reload();
-  }, 500);
+    console.log("Forcing page reload...");
+    // Force a hard reload to bypass cache
+    window.location.href = window.location.href + '?reset=' + Date.now();
+  }, 1000);
 }
 window.resetAll = resetAll;
 window.resetAllForceReload = resetAllForceReload;
+window.nuclearReset = nuclearReset;
+
+// Debug function to check localStorage state
+function debugLocalStorage(){
+  console.log("=== localStorage DEBUG ===");
+  console.log("LSKEY:", LSKEY);
+  console.log("Current state:", state);
+  
+  const saved = localStorage.getItem(LSKEY);
+  console.log("Saved data:", saved);
+  
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      console.log("Parsed data:", parsed);
+    } catch(e) {
+      console.error("Parse error:", e);
+    }
+  }
+  
+  console.log("All localStorage keys:", Object.keys(localStorage));
+  console.log("localStorage length:", localStorage.length);
+  console.log("========================");
+}
+
+window.debugLocalStorage = debugLocalStorage;
 
 /* ======== ENHANCED FACILITATOR AUTHENTICATION ======== */
 function hostKeyEnter(ev){
