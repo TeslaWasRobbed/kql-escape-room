@@ -185,6 +185,48 @@
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.05); }
     }
+    
+    /* Locked stages */
+    .stage.locked {
+      opacity: 0.6;
+      pointer-events: none;
+      position: relative;
+    }
+    
+    .stage.locked::after {
+      content: '🔒 Locked - Complete previous stage first';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--panel);
+      padding: 20px;
+      border: 2px solid var(--warn);
+      border-radius: 12px;
+      font-weight: 600;
+      color: var(--warn);
+      z-index: 10;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+    
+    .stage.unlocked {
+      animation: unlockStage 0.5s ease;
+    }
+    
+    @keyframes unlockStage {
+      0% { opacity: 0.6; transform: scale(0.95); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    
+    .stage.completed {
+      border-left-color: var(--ok);
+      background: linear-gradient(90deg, var(--success-bg), transparent);
+    }
+    
+    .stage.completed::before {
+      background: linear-gradient(to bottom, var(--ok), transparent);
+    }
   </style>
 
   <!-- Firebase modular SDK via ESM CDN (works on GitHub Pages) -->
@@ -338,7 +380,7 @@
       <div class="divider"></div>
 
       <!-- ===== STAGE 1 ===== -->
-      <section class="card stage" aria-labelledby="stage1-title">
+      <section class="card stage" id="stage-1" aria-labelledby="stage1-title">
         <h3 id="stage1-title">Stage 1 — Targeted account</h3>
         <p>Who had the MOST failed sign-ins in the last 2 hours?</p>
         <div class="row">
@@ -361,7 +403,7 @@
       </section>
 
       <!-- ===== STAGE 2 ===== -->
-      <section class="card stage" aria-labelledby="stage2-title">
+      <section class="card stage locked" id="stage-2" aria-labelledby="stage2-title">
         <h3 id="stage2-title">Stage 2 — Suspicious success IP</h3>
         <p>From which IP did that user eventually succeed?</p>
         <div class="row">
@@ -384,7 +426,7 @@
       </section>
 
       <!-- ===== STAGE 3 ===== -->
-      <section class="card stage" aria-labelledby="stage3-title">
+      <section class="card stage locked" id="stage-3" aria-labelledby="stage3-title">
         <h3 id="stage3-title">Stage 3 — Lateral movement host</h3>
         <p>Which computer did the user access next (4624/4648) from that IP?</p>
         <div class="row">
@@ -407,7 +449,7 @@
       </section>
 
       <!-- ===== STAGE 4 ===== -->
-      <section class="card stage" aria-labelledby="stage4-title">
+      <section class="card stage locked" id="stage-4" aria-labelledby="stage4-title">
         <h3 id="stage4-title">Stage 4 — Sensitive file</h3>
         <p>Which file did they access on that host?</p>
         <div class="row">
@@ -430,7 +472,7 @@
       </section>
 
       <!-- ===== STAGE 5 ===== -->
-      <section class="card stage" aria-labelledby="stage5-title">
+      <section class="card stage locked" id="stage-5" aria-labelledby="stage5-title">
         <h3 id="stage5-title">Stage 5 — Exfil destination</h3>
         <p>Which destination IP received a large outbound transfer soon after the file read?</p>
         <div class="row">
@@ -605,10 +647,82 @@ function updateProgress() {
   }
 }
 
+function updateStageVisibility() {
+  const completedStages = [];
+  
+  // Check which stages are completed
+  for (var key in ANSWERS) {
+    if (ANSWERS.hasOwnProperty(key)) {
+      var exp = ANSWERS[key];
+      var v = state.answers[key] || "";
+      var user = norm(v, !!exp.ci);
+      var ok = false;
+      
+      if (exp.type === "equals") {
+        for (var i = 0; i < exp.list.length; i++) {
+          if (user === norm(exp.list[i], !!exp.ci)) {
+            ok = true;
+            break;
+          }
+        }
+      } else if (exp.type === "contains") {
+        for (var i = 0; i < exp.list.length; i++) {
+          if (user.indexOf(norm(exp.list[i], !!exp.ci)) > -1) {
+            ok = true;
+            break;
+          }
+        }
+      } else if (exp.type === "regex") {
+        for (var i = 0; i < exp.list.length; i++) {
+          try {
+            var re = new RegExp(exp.list[i], exp.ci ? "i" : "");
+            if (re.test(v)) {
+              ok = true;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+      
+      if (ok) {
+        completedStages.push(parseInt(key));
+      }
+    }
+  }
+  
+  // Update stage classes
+  for (var i = 1; i <= 5; i++) {
+    const stageEl = document.getElementById(`stage-${i}`);
+    if (!stageEl) continue;
+    
+    // Remove all stage classes
+    stageEl.classList.remove('locked', 'unlocked', 'completed');
+    
+    if (completedStages.includes(i)) {
+      // Stage is completed
+      stageEl.classList.add('completed');
+    } else if (i === 1 || completedStages.includes(i - 1)) {
+      // Stage is unlocked (first stage or previous stage completed)
+      stageEl.classList.add('unlocked');
+    } else {
+      // Stage is locked
+      stageEl.classList.add('locked');
+    }
+  }
+}
+
 /* ======== ENHANCED HINT TOGGLE ======== */
 function toggleHint(id) {
   var el = document.getElementById(id);
   if(!el) return;
+  
+  // Check if the stage is locked
+  const stageNum = id.split('-')[1];
+  const stageEl = document.getElementById(`stage-${stageNum}`);
+  if (stageEl && stageEl.classList.contains('locked')) {
+    showStatus(`Stage ${stageNum} is locked. Complete the previous stage first.`, 'error');
+    return;
+  }
   
   const button = document.querySelector(`[aria-controls="${id}"]`);
   const isShowing = el.className.indexOf("show") > -1;
@@ -621,7 +735,6 @@ function toggleHint(id) {
   
   // Track hint usage
   if (!isShowing) {
-    const stageNum = id.split('-')[1];
     if (!state.attempts[stageNum]) {
       state.attempts[stageNum] = { hintsUsed: 0, attempts: 0 };
     }
@@ -636,6 +749,13 @@ function check(n) {
   var inp = document.getElementById("ans-"+n);
   var msg = document.getElementById("msg-"+n);
   if(!inp || !msg) return;
+
+  // Check if stage is locked
+  const stageEl = document.getElementById(`stage-${n}`);
+  if (stageEl && stageEl.classList.contains('locked')) {
+    showStatus(`Stage ${n} is locked. Complete the previous stage first.`, 'error');
+    return;
+  }
 
   var val = inp.value || "";
   state.answers[n] = val;
@@ -690,6 +810,7 @@ function check(n) {
   
   updateScore();
   updateProgress();
+  updateStageVisibility();
   persist();
   
   if(allCorrect()) finishRun();
@@ -1185,9 +1306,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Update score and progress
+  // Update score, progress, and stage visibility
   updateScore();
   updateProgress();
+  updateStageVisibility();
   
   // Restore answers
   for (var i = 1; i <= 5; i++) {
