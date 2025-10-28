@@ -277,18 +277,27 @@
         }
 
         try {
+          console.log("Initializing Firebase for event:", eventId);
           await signInAnonymously(this.auth);
+          console.log("Firebase auth successful");
+          
           this.ref = ref(this.db, `leaderboards/${eventId}/scores`);
+          console.log("Firebase ref created:", this.ref.toString());
           
           // Listen for real-time updates with caching
           onValue(this.ref, (snap) => {
+            console.log("Firebase data snapshot received:", snap.exists());
             const list = [];
-            snap.forEach(child => {
-              const data = child.val();
-              if (data && typeof data === 'object') {
-                list.push({ ...data, id: child.key });
-              }
-            });
+            if (snap.exists()) {
+              snap.forEach(child => {
+                const data = child.val();
+                if (data && typeof data === 'object') {
+                  list.push({ ...data, id: child.key });
+                }
+              });
+            }
+            
+            console.log("Processed Firebase data:", list.length, "entries");
             
             // Cache the results
             this.cache.set(eventId, { data: list, timestamp: Date.now() });
@@ -300,8 +309,10 @@
             // Try to use cached data if available
             const cached = this.cache.get(eventId);
             if (cached && Date.now() - cached.timestamp < 300000) { // 5 min cache
+              console.log("Using cached data due to error");
               renderShared(cached.data);
             } else {
+              console.log("No cached data available, using local mode");
               renderLocal();
             }
           });
@@ -312,9 +323,10 @@
         }
       },
       
-      async submit(entry, renderLocal) {
+      async submit(entry, callback) {
         if (!this.enabled || !this.ref) {
-          renderLocal();
+          console.warn("Firebase not enabled or ref not set");
+          if (callback) callback();
           return;
         }
 
@@ -327,6 +339,7 @@
             score: Math.max(0, Math.min(entry.score || 0, 5))
           };
           
+          console.log("Submitting to Firebase:", validatedEntry);
           await push(this.ref, validatedEntry);
           
           // Update cache
@@ -335,9 +348,12 @@
             cached.data.push(validatedEntry);
             cached.timestamp = Date.now();
           }
+          
+          console.log("Score submitted successfully to Firebase");
+          if (callback) callback();
         } catch (err) {
           console.error("Submit score failed:", err);
-          renderLocal();
+          if (callback) callback();
         }
       }
     };
@@ -937,7 +953,7 @@ window.resetTimer = resetTimer;
 /* ======== ENHANCED Firebase bridge ======== */
 function initFirebaseAndLeaderboard(){
   var fb = window.__FB;
-  if(!fb){ 
+  if(!fb || !fb.enabled){ 
     console.warn("Firebase not loaded; using local leaderboard only."); 
     renderBoardLocal(); 
     showStatus("Running in offline mode", 'warn');
@@ -945,13 +961,23 @@ function initFirebaseAndLeaderboard(){
   }
   
   showStatus("Connecting to leaderboard...", 'info');
-  fb.init(EVENT_ID, renderBoardShared, renderBoardLocal);
+  
+  // Initialize Firebase with better error handling
+  fb.init(EVENT_ID, function(list) {
+    console.log("Firebase data received:", list);
+    renderBoardShared(list);
+    showStatus("Leaderboard connected!", 'success');
+  }, function() {
+    console.warn("Firebase init failed, using local mode");
+    renderBoardLocal();
+    showStatus("Using local leaderboard", 'warn');
+  });
 }
 window.addEventListener("load", initFirebaseAndLeaderboard);
 
 function submitScoreShared(entry){
   var fb = window.__FB;
-  if(!fb){ 
+  if(!fb || !fb.enabled){ 
     state.board.push(entry); 
     persist(); 
     renderBoardLocal(); 
@@ -960,10 +986,14 @@ function submitScoreShared(entry){
   }
   
   showStatus("Submitting score...", 'info');
+  
+  // Add entry to local state immediately for better UX
+  state.board.push(entry); 
+  persist(); 
+  renderBoardLocal();
+  
+  // Submit to Firebase
   fb.submit(entry, function(){ 
-    state.board.push(entry); 
-    persist(); 
-    renderBoardLocal(); 
     showStatus("Score submitted successfully!", 'success');
   });
 }
@@ -1172,19 +1202,70 @@ function resetAll(){
                 
   if(!confirm(message)) return;
   
-  // Clear all data
+  // Stop timer first
+  stopTimer();
+  
+  // Clear all localStorage data
   localStorage.removeItem(LSKEY);
   localStorage.removeItem('kql-escape-theme');
   
-  showStatus("All data cleared. Refreshing...", 'info');
+  // Reset all state variables
+  state = {
+    answers: {},
+    host: false,
+    board: [],
+    team: "",
+    startTs: null,
+    attempts: {},
+    facilitatorAttempts: 0,
+    facilitatorLocked: false
+  };
   
-  // Reset timer button
+  // Reset UI elements
   resetTimer();
   
-  // Reload page after a short delay
-  setTimeout(() => {
-    location.reload();
-  }, 1000);
+  // Clear all answer inputs
+  for (var i = 1; i <= 5; i++) {
+    const input = document.getElementById(`ans-${i}`);
+    const msg = document.getElementById(`msg-${i}`);
+    if (input) input.value = "";
+    if (msg) {
+      msg.textContent = "";
+      msg.className = "muted";
+    }
+  }
+  
+  // Reset team name input
+  const teamInput = document.getElementById("teamName");
+  if (teamInput) teamInput.value = "";
+  
+  // Reset score display
+  const scoreEl = document.getElementById("score");
+  if (scoreEl) scoreEl.textContent = "0";
+  
+  // Reset progress bar
+  const progressFill = document.getElementById('progressFill');
+  if (progressFill) progressFill.style.width = "0%";
+  
+  // Reset stage visibility
+  updateStageVisibility();
+  
+  // Clear leaderboard
+  renderBoardLocal();
+  
+  // Hide facilitator keys
+  revealKeys(false);
+  const hostNote = document.getElementById("hostNote");
+  if (hostNote) hostNote.style.display = "none";
+  
+  // Clear facilitator input
+  const hostKeyInput = document.getElementById("hostKey");
+  if (hostKeyInput) {
+    hostKeyInput.value = "";
+    hostKeyInput.type = "password";
+  }
+  
+  showStatus("All data cleared successfully!", 'success');
 }
 window.resetAll = resetAll;
 
