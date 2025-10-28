@@ -182,12 +182,19 @@ Or switch EVENT_ID in the file for a fresh board.
 
 ❓FAQ
 Q: Can we run this without Firebase?
+
 A: Yes. The page still works with a local leaderboard stored in the browser. Only shared standings require Firebase.
+
 Q: Can we run multiple rooms simultaneously?
+
 A: Yes. Change EVENT_ID (e.g., kql-escape-roomA) and deploy separate page URLs (or branches).
+
 Q: Can we force team PINs or restrict team name changes?
+
 A: You can add a pin field in submissions and a constant EVENT_PIN in the page. Update rules to require pin == 'XYZ'.
+
 Q: Can you add support for ?event= in the URL?
+
 A: Yes. Parse new URLSearchParams(location.search).get('event') and fall back to the default. (Happy to add this if you want it.)
 
 🧑‍💻 Directory
