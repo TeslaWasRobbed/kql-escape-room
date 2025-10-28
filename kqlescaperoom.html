@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KQL Escape Room — Shared Leaderboard</title>
+  <style>
+    :root { --bg:#0b0f17; --panel:#121826; --ink:#e6edf3; --muted:#93a2b1; --brand:#66b2ff; --ok:#3ddc97; --err:#ff6b6b; --warn:#ffd166; --border:#1e2a3a; --accent:#233044; }
+    [data-theme="light"] { --bg:#f8fafc; --panel:#fff; --ink:#0b1220; --muted:#425466; --brand:#0a84ff; --ok:#0f9d58; --err:#c0392b; --warn:#e1a500; --border:#e6ecf2; --accent:#eef4ff; }
+    html,body{height:100%} body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:var(--bg);color:var(--ink)}
+    header{display:flex;gap:12px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);background:linear-gradient(0deg,var(--panel),var(--accent));position:sticky;top:0;z-index:10}
+    header h1{font:600 18px/1.2 system-ui;margin:0}
+    .pill{padding:6px 10px;border:1px solid var(--border);background:var(--panel);border-radius:8px;display:inline-flex;gap:8px;align-items:center}
+    .wrap{max-width:1100px;margin:0 auto;padding:20px}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media (min-width:1000px){.grid{grid-template-columns:1.1fr .9fr}}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+    .stage{border-left:3px solid var(--brand)}
+    h2,h3{margin:0 0 10px 0}
+    .hint{margin:10px 0;padding:10px;background:var(--accent);border:1px dashed var(--border);border-radius:8px;display:none}
+    .hint.show{display:block}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    input[type=text]{background:#0000;color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:260px}
+    button{background:var(--brand);color:#00121f;border:0;padding:10px 12px;border-radius:8px;font-weight:600;cursor:pointer}
+    button.ghost{background:#0000;color:var(--ink);border:1px solid var(--border)}
+    .muted{color:var(--muted)} .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
+    .kql-tip{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;background:#0002;padding:8px 10px;border-radius:8px;border:1px solid var(--border)}
+    .score{font:700 24px/1 system-ui}
+    .table{width:100%;border-collapse:collapse;font-size:14px}
+    .table th,.table td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:left}
+    footer{margin:20px 0;color:var(--muted);font-size:13px}
+    .divider{height:1px;background:var(--border);margin:12px 0}
+    .badge{padding:4px 7px;background:#0000;border:1px solid var(--border);border-radius:6px}
+  </style>
+
+  <!-- Firebase modular SDK via ESM CDN (works on GitHub Pages) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAnalytics }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // === Your Firebase config (as provided) ===
+    const firebaseConfig = {
+      apiKey: "AIzaSyCahMur9fNz-qhJf04TtBPpooUku68U5Ls",
+      authDomain: "kql-escape-room.firebaseapp.com",
+      databaseURL: "https://kql-escape-room-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "kql-escape-room",
+      storageBucket: "kql-escape-room.firebasestorage.app",
+      messagingSenderId: "589089049953",
+      appId: "1:589089049953:web:e2aa14b44dd4d559b38920",
+      measurementId: "G-C04WWZ57FE"
+    };
+
+    // Boot Firebase
+    const app = initializeApp(firebaseConfig);
+    try { getAnalytics(app); } catch(e) { /* analytics may fail on non-https/local */ }
+
+    // Build a simple bridge so the non-module UI script can use Firebase
+    const fb = {
+      app,
+      auth: getAuth(app),
+      db: getDatabase(app),
+      enabled: true,
+      ref: null,
+      // INIT with event id (room)
+      init(eventId, renderShared, renderLocal) {
+        signInAnonymously(this.auth).then(()=>{
+          this.ref = ref(this.db, `leaderboards/${eventId}/scores`);
+          onValue(this.ref, (snap)=>{
+            const list = [];
+            snap.forEach(child => list.push(child.val()));
+            renderShared(list);
+          }, (err)=>{
+            console.error("Leaderboard read error:", err);
+            renderLocal(); // fallback
+          });
+        }).catch((err)=>{
+          console.error("Anonymous auth failed:", err);
+          this.enabled = false;
+          renderLocal();
+        });
+      },
+      submit(entry, renderLocal) {
+        if (!this.enabled || !this.ref) { renderLocal(); return; }
+        push(this.ref, entry).catch((err)=>{
+          console.error("Submit score failed:", err);
+          renderLocal();
+        });
+      }
+    };
+
+    // Expose for the non-module script
+    window.__FB = fb;
+  </script>
+</head>
+<body>
+
+<header>
+  <h1>🕵️ KQL Escape Room (Shared Leaderboard)</h1>
+  <div class="pill">
+    <span>Team:</span>
+    <input id="teamName" type="text" placeholder="e.g., Blue" />
+    <button class="ghost" id="startTimerBtn" onclick="startTimer()">Start timer</button>
+    <span class="badge" id="timer">00:00</span>
+  </div>
+  <div class="pill">
+    <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌓</button>
+    <button class="ghost" id="exportBtn" onclick="exportCSV()">Export CSV</button>
+    <button class="ghost" id="resetBtn" onclick="resetAll()">Reset</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <main class="card">
+      <h2>Scenario</h2>
+      <p class="muted">Write KQL in <b>your Sentinel workspace</b>, then enter answers here. The leaderboard updates for all teams in real time.</p>
+      <div class="divider"></div>
+
+      <!-- ===== STAGE 1 ===== -->
+      <section class="card stage">
+        <h3>Stage 1 — Targeted account</h3>
+        <p>Who had the MOST failed sign-ins in the last 2 hours?</p>
+        <div class="row">
+          <input type="text" id="ans-1" placeholder="Enter your answer" />
+          <button class="ghost" onclick="toggleHint('hint1-1')">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-1')">Hint 2</button>
+          <button onclick="check(1)">Check</button>
+          <span id="msg-1" class="muted"></span>
+        </div>
+        <div id="hint1-1" class="hint">Filter non-zero result types; group and sort.</div>
+        <div id="hint2-1" class="hint">Try: <code>summarize count() by UserPrincipalName | top 1 by count_ desc</code>.</div>
+        <div id="key-1" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> alex.james@contoso.com</div>
+      </section>
+
+      <!-- ===== STAGE 2 ===== -->
+      <section class="card stage">
+        <h3>Stage 2 — Suspicious success IP</h3>
+        <p>From which IP did that user eventually succeed?</p>
+        <div class="row">
+          <input type="text" id="ans-2" placeholder="Enter your answer" />
+          <button class="ghost" onclick="toggleHint('hint1-2')">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-2')">Hint 2</button>
+          <button onclick="check(2)">Check</button>
+          <span id="msg-2" class="muted"></span>
+        </div>
+        <div id="hint1-2" class="hint">Filter same user with <code>ResultType == 0</code> (success).</div>
+        <div id="hint2-2" class="hint">Summarize distinct IPs; earliest success is fine.</div>
+        <div id="key-2" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> 198.51.100.23</div>
+      </section>
+
+      <!-- ===== STAGE 3 ===== -->
+      <section class="card stage">
+        <h3>Stage 3 — Lateral movement host</h3>
+        <p>Which computer did the user access next (4624/4648) from that IP?</p>
+        <div class="row">
+          <input type="text" id="ans-3" placeholder="Enter your answer" />
+          <button class="ghost" onclick="toggleHint('hint1-3')">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-3')">Hint 2</button>
+          <button onclick="check(3)">Check</button>
+          <span id="msg-3" class="muted"></span>
+        </div>
+        <div id="hint1-3" class="hint">Windows logon + explicit credentials; filter by IP and account.</div>
+        <div id="hint2-3" class="hint">Summarize by <code>Computer</code>.</div>
+        <div id="key-3" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> FS-SRV01</div>
+      </section>
+
+      <!-- ===== STAGE 4 ===== -->
+      <section class="card stage">
+        <h3>Stage 4 — Sensitive file</h3>
+        <p>Which file did they access on that host?</p>
+        <div class="row">
+          <input type="text" id="ans-4" placeholder="Enter your answer" />
+          <button class="ghost" onclick="toggleHint('hint1-4')">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-4')">Hint 2</button>
+          <button onclick="check(4)">Check</button>
+          <span id="msg-4" class="muted"></span>
+        </div>
+        <div id="hint1-4" class="hint">Relate to file access by user + host.</div>
+        <div id="hint2-4" class="hint">Look for reads near the logon time.</div>
+        <div id="key-4" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> Confidential.xlsx</div>
+      </section>
+
+      <!-- ===== STAGE 5 ===== -->
+      <section class="card stage">
+        <h3>Stage 5 — Exfil destination</h3>
+        <p>Which destination IP received a large outbound transfer soon after the file read?</p>
+        <div class="row">
+          <input type="text" id="ans-5" placeholder="Enter your answer" />
+          <button class="ghost" onclick="toggleHint('hint1-5')">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-5')">Hint 2</button>
+          <button onclick="check(5)">Check</button>
+          <span id="msg-5" class="muted"></span>
+        </div>
+        <div id="hint1-5" class="hint">Window: within ~10 minutes after the read.</div>
+        <div id="hint2-5" class="hint"><code>BytesSent &gt; 10,000,000</code>; order by desc.</div>
+        <div id="key-5" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> 203.0.113.200</div>
+      </section>
+
+      <div class="divider"></div>
+      <div class="row">
+        <div class="score">Score: <span id="score">0</span>/5</div>
+        <div class="muted">All checking is local; leaderboard syncs to Firebase.</div>
+      </div>
+    </main>
+
+    <aside class="card">
+      <h3>How to play</h3>
+      <ol>
+        <li>Open <b>Sentinel → Logs</b> in your training workspace.</li>
+        <li>Use these watchlists in your queries:
+          <ul>
+            <li><code>_GetWatchlist('SigninLogs_WL')</code> — Sign-in events</li>
+            <li><code>_GetWatchlist('SecurityEvent_WL')</code> — Windows logons</li>
+            <li><code>_GetWatchlist('FileAccess_WL')</code> — File access logs</li>
+            <li><code>_GetWatchlist('Network_WL')</code> — Network events</li>
+          </ul>
+        </li>
+        <li>Write KQL, run in Sentinel, then paste answers here and click <b>Check</b>.</li>
+      </ol>
+      <p class="kql-tip"><b>Tip:</b> Watchlists return strings. Cast with <code>todatetime()</code>, <code>tolong()</code> for time/number comparisons.</p>
+
+      <div class="divider"></div>
+      <h3>Facilitator</h3>
+      <p class="muted">Enter <code>showanswers</code> below and press Enter to reveal answer keys (this browser only).</p>
+      <input type="text" id="hostKey" placeholder="Enter facilitator key" onkeypress="hostKeyEnter(event)" />
+      <div id="hostNote" class="muted" style="display:none">✅ Answers revealed. Refresh to hide.</div>
+
+      <div class="divider"></div>
+      <h3>Leaderboard (shared)</h3>
+      <div class="muted" style="margin-bottom:8px">
+        Event: <code id="eventLabel"></code>
+      </div>
+      <table class="table" id="board"><thead><tr><th>Team</th><th>Score</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table>
+    </aside>
+  </div>
+
+  <footer><span class="muted">Static page on GitHub Pages. Firebase powers the shared leaderboard.</span></footer>
+</div>
+
+<!-- UI / logic (non-module; uses window.__FB from the module above) -->
+<script>
+/* ======== CONFIG / EXPECTED ANSWERS ======== */
+var ANSWERS = {
+  1: { type:"equals",   list:["alex.james@contoso.com"], ci:true },
+  2: { type:"equals",   list:["198.51.100.23"],          ci:true },
+  3: { type:"equals",   list:["FS-SRV01"],               ci:true },
+  4: { type:"contains", list:["confidential.xlsx"],      ci:true },
+  5: { type:"equals",   list:["203.0.113.200"],          ci:true }
+};
+var PASSCODE = "showanswers";
+
+/* Event (room) id: from URL ?event= or default to today's date */
+var Q = new URLSearchParams(location.search);
+var EVENT_ID = Q.get("event") || ("kql-escape-" + new Date().toISOString().slice(0,10));
+document.getElementById("eventLabel").textContent = EVENT_ID;
+
+/* ======== STATE ======== */
+var LSKEY = "kql-escape-shared-v1";
+var state = {};
+try { state = JSON.parse(localStorage.getItem(LSKEY) || "{}"); } catch(e) { state = {}; }
+state.answers = state.answers || {};
+state.host = !!state.host;
+state.board = state.board || []; // local fallback only
+state.team = state.team || "";
+
+/* ======== HELPERS ======== */
+function persist(){ try { localStorage.setItem(LSKEY, JSON.stringify(state)); } catch(e){} }
+function norm(s, ci){ var v = (s===undefined || s===null) ? "" : String(s); v = v.replace(/^\s+|\s+$/g,""); return ci ? v.toLowerCase() : v; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]);}); }
+
+/* ======== HINT TOGGLE ======== */
+function toggleHint(id){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.className = el.className.indexOf("show")>-1 ? el.className.replace(" show","") : (el.className+" show");
+}
+window.toggleHint = toggleHint;
+
+/* ======== CHECK & SCORE ======== */
+function check(n){
+  var inp = document.getElementById("ans-"+n);
+  var msg = document.getElementById("msg-"+n);
+  if(!inp || !msg) return;
+
+  var val = inp.value || "";
+  state.answers[n] = val;
+  persist();
+
+  var exp = ANSWERS[n];
+  var user = norm(val, !!exp.ci);
+  var ok = false;
+
+  if(exp.type==="equals"){
+    for(var i=0;i<exp.list.length;i++){ if(user === norm(exp.list[i], !!exp.ci)) { ok=true; break; } }
+  } else if(exp.type==="contains"){
+    for(var j=0;j<exp.list.length;j++){ if(user.indexOf(norm(exp.list[j], !!exp.ci))>-1) { ok=true; break; } }
+  } else if(exp.type==="regex"){
+    for(var k=0;k<exp.list.length;k++){ try{ var re = new RegExp(exp.list[k], exp.ci?"i":""); if(re.test(val)){ ok=true; break; } }catch(e){} }
+  }
+
+  msg.textContent = ok ? "✔ Correct" : "✖ Not quite — try again";
+  msg.className = ok ? "ok" : "err";
+  updateScore();
+  if(allCorrect()) finishRun();
+}
+window.check = check;
+
+function updateScore(){
+  var total=0, got=0;
+  for(var key in ANSWERS){
+    if(ANSWERS.hasOwnProperty(key)){
+      total++;
+      var exp = ANSWERS[key];
+      var v = state.answers[key] || "";
+      var user = norm(v, !!exp.ci);
+      var ok=false, i;
+      if(exp.type==="equals"){
+        for(i=0;i<exp.list.length;i++){ if(user===norm(exp.list[i],!!exp.ci)){ ok=true;break; } }
+      } else if(exp.type==="contains"){
+        for(i=0;i<exp.list.length;i++){ if(user.indexOf(norm(exp.list[i],!!exp.ci))>-1){ ok=true;break; } }
+      } else if(exp.type==="regex"){
+        for(i=0;i<exp.list.length;i++){ try{ var re=new RegExp(exp.list[i], exp.ci?"i":""); if(re.test(v)){ ok=true;break; } }catch(e){} }
+      }
+      if(ok) got++;
+    }
+  }
+  var sc = document.getElementById("score");
+  if(sc) sc.textContent = String(got);
+  return got===total ? total : got;
+}
+function allCorrect(){
+  var total=0; for(var k in ANSWERS){ if(ANSWERS.hasOwnProperty(k)) total++; }
+  var cur = updateScore(); return cur===total;
+}
+
+/* ======== TIMER / BOARD (local) ======== */
+var timerEl = document.getElementById("timer");
+var startTs = state.startTs || null;
+var timerInt = null;
+
+function fmt(ms){ var m=Math.floor(ms/60000), s=Math.floor(ms/1000)%60; return (m<10?"0":"")+m+":"+(s<10?"0":"")+s; }
+function tick(){ var now=Date.now(); timerEl.textContent = startTs ? fmt(now-startTs) : "00:00"; }
+setInterval(tick,1000); tick();
+
+function startTimer(){
+  if(startTs) return;
+  startTs = Date.now(); state.startTs = startTs; persist();
+  timerInt = setInterval(tick,500); tick();
+}
+function stopTimer(){ if(timerInt){ clearInterval(timerInt); timerInt=null; } }
+window.startTimer = startTimer;
+
+/* ======== Firebase bridge ======== */
+function initFirebaseAndLeaderboard(){
+  var fb = window.__FB;
+  if(!fb){ console.warn("Firebase not loaded; using local leaderboard only."); renderBoardLocal(); return; }
+  fb.init(EVENT_ID, renderBoardShared, renderBoardLocal);
+}
+window.addEventListener("load", initFirebaseAndLeaderboard);
+
+function submitScoreShared(entry){
+  var fb = window.__FB;
+  if(!fb){ state.board.push(entry); persist(); renderBoardLocal(); return; }
+  fb.submit(entry, function(){ state.board.push(entry); persist(); renderBoardLocal(); });
+}
+
+/* ======== Render leaderboards ======== */
+function renderBoardShared(list){
+  var tbody = document.querySelector("#board tbody");
+  if(!tbody) return;
+  tbody.innerHTML = "";
+  list.sort(function(a,b){ if(a.score!==b.score) return b.score-a.score; return a.time.localeCompare(b.time); });
+  for(var i=0;i<list.length;i++){
+    var r=list[i], tr=document.createElement("tr");
+    tr.innerHTML = "<td>"+escapeHtml(r.team)+"</td><td>"+r.score+"</td><td>"+r.time+"</td><td>"+new Date(r.when).toLocaleString()+"</td>";
+    tbody.appendChild(tr);
+  }
+}
+function renderBoardLocal(){
+  var tbody = document.querySelector("#board tbody");
+  if(!tbody) return;
+  tbody.innerHTML = "";
+  var list = (state.board||[]).slice();
+  list.sort(function(a,b){ if(a.score!==b.score) return b.score-a.score; return a.time.localeCompare(b.time); });
+  for(var i=0;i<list.length;i++){
+    var r=list[i], tr=document.createElement("tr");
+    tr.innerHTML = "<td>"+escapeHtml(r.team)+"</td><td>"+r.score+"</td><td>"+r.time+"</td><td>"+new Date(r.when).toLocaleString()+"</td>";
+    tbody.appendChild(tr);
+  }
+}
+
+/* ======== Finish & submit ======== */
+function finishRun(){
+  stopTimer();
+  var elapsed = startTs ? timerEl.textContent : "00:00";
+  var team = state.team||"Anonymous";
+  if (!team || team.replace(/\s+/g,"").length === 0) team = "Anonymous";
+  if (team.length > 40) team = team.slice(0,40);
+
+  var entry = { team: team, score: Object.keys(ANSWERS).length, time: elapsed, when: Date.now() };
+  submitScoreShared(entry);
+  alert("Well done "+entry.team+"! Score "+entry.score+"/"+Object.keys(ANSWERS).length+" in "+entry.time);
+}
+
+/* ======== THEME / EXPORT / RESET ======== */
+function toggleTheme(){
+  var root=document.documentElement; var cur=root.getAttribute("data-theme");
+  root.setAttribute("data-theme", cur==="dark"?"light":"dark");
+}
+window.toggleTheme = toggleTheme;
+
+function exportCSV(){
+  // Exports local fallback only (shared board is remote)
+  var rows = (state.board||[]).map(function(b){return [b.team,b.score,b.time,new Date(b.when).toISOString()].join(",");});
+  var csv = "Team,Score,Time,When\n"+rows.join("\n");
+  var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="kql-escape-board-local.csv"; a.click();
+}
+window.exportCSV = exportCSV;
+
+function resetAll(){
+  if(!confirm("Clear your answers, timer and local fallback leaderboard? (Shared scores remain in Firebase)")) return;
+  localStorage.removeItem(LSKEY); location.reload();
+}
+window.resetAll = resetAll;
+
+/* ======== FACILITATOR ======== */
+function hostKeyEnter(ev){
+  if(ev.key!=="Enter") return;
+  var val = ev.target.value.replace(/^\s+|\s+$/g,"");
+  if(val==="showanswers"){
+    state.host = true; persist();
+    revealKeys(true);
+    document.getElementById("hostNote").style.display="block";
+  } else {
+    alert("Wrong key");
+  }
+}
+window.hostKeyEnter = hostKeyEnter;
+
+function revealKeys(show){
+  for(var i=1;i<=5;i++){
+    var el = document.getElementById("key-"+i);
+    if(!el) continue;
+    if(show){ if(el.className.indexOf("show")===-1) el.className += " show"; }
+    else     { el.className = el.className.replace(" show",""); }
+  }
+}
+
+/* ======== TEAM NAME ======== */
+var teamInput = document.getElementById("teamName");
+teamInput.value = state.team || "";
+teamInput.oninput = function(){ state.team = teamInput.value; persist(); };
+
+/* ======== ON LOAD: restore host + timer + score ======== */
+if(state.host){ revealKeys(true); document.getElementById("hostNote").style.display="block"; }
+if(state.startTs){ startTs = state.startTs; tick(); }
+updateScore();
+</script>
+</body>
+</html>
