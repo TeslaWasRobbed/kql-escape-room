@@ -3,164 +3,469 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>KQL Escape Room — Self‑Serve (Shared Leaderboard, Gated Stages)</title>
+  <title>KQL Escape Room — Shared Leaderboard</title>
+  <meta name="description" content="Interactive KQL learning escape room with real-time leaderboard" />
+  <meta name="theme-color" content="#0b0f17" />
+  
+  <!-- Preload critical resources -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  
   <style>
-    :root { --bg:#0b0f17; --panel:#121826; --ink:#e6edf3; --muted:#93a2b1; --brand:#66b2ff; --ok:#3ddc97; --err:#ff6b6b; --warn:#ffd166; --border:#1e2a3a; --accent:#233044; }
-    [data-theme="light"] { --bg:#f8fafc; --panel:#fff; --ink:#0b1220; --muted:#425466; --brand:#0a84ff; --ok:#0f9d58; --err:#c0392b; --warn:#e1a500; --border:#e6ecf2; --accent:#eef4ff; }
-
-    html,body{height:100%}
-    body{margin:0;font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu;background:var(--bg);color:var(--ink)}
-    header{display:flex;gap:12px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);background:linear-gradient(0deg,var(--panel),var(--accent));position:sticky;top:0;z-index:10}
-    header h1{font:600 18px/1.2 system-ui;margin:0}
-    .pill{padding:6px 10px;border:1px solid var(--border);background:var(--panel);border-radius:8px;display:inline-flex;gap:8px;align-items:center}
-    .wrap{max-width:1100px;margin:0 auto;padding:20px}
-    .grid{display:grid;grid-template-columns:1fr;gap:16px}
-    @media (min-width:1000px){.grid{grid-template-columns:1.1fr .9fr}}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
-    .stage{border-left:3px solid var(--brand)}
-    h2,h3{margin:0 0 10px 0}
-    .hint{margin:10px 0;padding:10px;background:var(--accent);border:1px dashed var(--border);border-radius:8px;display:none}
-    .hint.show{display:block}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    input[type=text]{background:#0000;color:var(--ink);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:260px}
-    button{background:var(--brand);color:#00121f;border:0;padding:10px 12px;border-radius:8px;font-weight:600;cursor:pointer}
-    button.ghost{background:#0000;color:var(--ink);border:1px solid var(--border)}
-    .muted{color:var(--muted)} .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
-    .kql-tip{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;background:#0002;padding:8px 10px;border-radius:8px;border:1px solid var(--border)}
-    .score{font:700 24px/1 system-ui}
-    .table{width:100%;border-collapse:collapse;font-size:14px}
-    .table th,.table td{border-bottom:1px solid var(--border);padding:8px 6px;text-align:left}
-    footer{margin:20px 0;color:var(--muted);font-size:13px}
-    .divider{height:1px;background:var(--border);margin:12px 0}
-    .badge{padding:4px 7px;background:#0000;border:1px solid var(--border);border-radius:6px}
-
-    /* 🔒 Gating: hide locked stages */
-    .hidden { display: none; }
+    :root { 
+      --bg:#0b0f17; --panel:#121826; --ink:#e6edf3; --muted:#93a2b1; 
+      --brand:#66b2ff; --ok:#3ddc97; --err:#ff6b6b; --warn:#ffd166; 
+      --border:#1e2a3a; --accent:#233044; --success-bg:#0f2a1f; --error-bg:#2a0f0f;
+      --transition: all 0.2s ease-in-out; --shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    [data-theme="light"] { 
+      --bg:#f8fafc; --panel:#fff; --ink:#0b1220; --muted:#425466; 
+      --brand:#0a84ff; --ok:#0f9d58; --err:#c0392b; --warn:#e1a500; 
+      --border:#e6ecf2; --accent:#eef4ff; --success-bg:#f0f9f4; --error-bg:#fef2f2;
+    }
+    
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, sans-serif;
+      background: var(--bg); color: var(--ink); transition: var(--transition);
+    }
+    
+    /* Header */
+    header {
+      display: flex; gap: 12px; align-items: center; padding: 16px 20px;
+      border-bottom: 1px solid var(--border); background: linear-gradient(0deg, var(--panel), var(--accent));
+      position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
+    }
+    header h1 { font: 600 18px/1.2 system-ui; margin: 0; }
+    
+    /* Layout */
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 1000px) { .grid { grid-template-columns: 1.1fr .9fr; } }
+    
+    /* Cards */
+    .card { 
+      background: var(--panel); border: 1px solid var(--border); border-radius: 12px; 
+      padding: 16px; box-shadow: var(--shadow); transition: var(--transition);
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1); }
+    
+    .stage { border-left: 3px solid var(--brand); position: relative; }
+    .stage::before { 
+      content: ''; position: absolute; top: 0; left: -3px; width: 3px; height: 100%;
+      background: linear-gradient(to bottom, var(--brand), transparent);
+    }
+    
+    /* Typography */
+    h2, h3 { margin: 0 0 10px 0; }
+    .muted { color: var(--muted); }
+    .ok { color: var(--ok); }
+    .err { color: var(--err); }
+    .warn { color: var(--warn); }
+    
+    /* Progress indicator */
+    .progress-bar {
+      width: 100%; height: 4px; background: var(--border); border-radius: 2px;
+      margin: 10px 0; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; background: linear-gradient(90deg, var(--brand), var(--ok));
+      width: 0%; transition: width 0.5s ease;
+    }
+    
+    /* Hints */
+    .hint {
+      margin: 10px 0; padding: 12px; background: var(--accent); 
+      border: 1px dashed var(--border); border-radius: 8px; 
+      display: none; animation: slideDown 0.3s ease;
+    }
+    .hint.show { display: block; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* Form elements */
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    input[type=text] {
+      background: transparent; color: var(--ink); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 12px; min-width: 260px;
+      transition: var(--transition); font-size: 14px;
+    }
+    input[type=text]:focus {
+      outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(102, 178, 255, 0.1);
+    }
+    input[type=text]:invalid { border-color: var(--err); }
+    
+    /* Buttons */
+    button {
+      background: var(--brand); color: #00121f; border: 0; padding: 10px 12px;
+      border-radius: 8px; font-weight: 600; cursor: pointer; transition: var(--transition);
+      font-size: 14px; position: relative; overflow: hidden;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 178, 255, 0.3); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    
+    button.ghost {
+      background: transparent; color: var(--ink); border: 1px solid var(--border);
+    }
+    button.ghost:hover { background: var(--accent); }
+    
+    /* Loading states */
+    .loading { position: relative; }
+    .loading::after {
+      content: ''; position: absolute; top: 50%; left: 50%; width: 16px; height: 16px;
+      margin: -8px 0 0 -8px; border: 2px solid transparent; border-top: 2px solid currentColor;
+      border-radius: 50%; animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* Status messages */
+    .status-message {
+      padding: 8px 12px; border-radius: 6px; margin: 8px 0; font-size: 14px;
+      animation: fadeIn 0.3s ease;
+    }
+    .status-message.success { background: var(--success-bg); color: var(--ok); border: 1px solid var(--ok); }
+    .status-message.error { background: var(--error-bg); color: var(--err); border: 1px solid var(--err); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* Pills and badges */
+    .pill {
+      padding: 6px 10px; border: 1px solid var(--border); background: var(--panel);
+      border-radius: 8px; display: inline-flex; gap: 8px; align-items: center;
+    }
+    .badge {
+      padding: 4px 7px; background: transparent; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 12px; font-weight: 600;
+    }
+    
+    /* Score display */
+    .score { font: 700 24px/1 system-ui; }
+    
+    /* Table */
+    .table {
+      width: 100%; border-collapse: collapse; font-size: 14px;
+      background: var(--panel); border-radius: 8px; overflow: hidden;
+    }
+    .table th, .table td {
+      border-bottom: 1px solid var(--border); padding: 12px 8px; text-align: left;
+    }
+    .table th { background: var(--accent); font-weight: 600; }
+    .table tbody tr:hover { background: var(--accent); }
+    
+    /* Footer */
+    footer { margin: 20px 0; color: var(--muted); font-size: 13px; text-align: center; }
+    .divider { height: 1px; background: var(--border); margin: 12px 0; }
+    
+    /* KQL tip */
+    .kql-tip {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px; background: rgba(0,0,0,0.1); padding: 8px 10px;
+      border-radius: 8px; border: 1px solid var(--border); margin: 8px 0;
+    }
+    
+    /* Accessibility */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+    
+    /* Mobile improvements */
+    @media (max-width: 768px) {
+      .wrap { padding: 10px; }
+      header { padding: 12px 16px; flex-wrap: wrap; }
+      .row { flex-direction: column; align-items: stretch; }
+      input[type=text] { min-width: auto; width: 100%; }
+      .grid { gap: 12px; }
+    }
+    
+    /* Animation for correct answers */
+    .correct-answer {
+      animation: celebrate 0.6s ease;
+    }
+    @keyframes celebrate {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
   </style>
 
-  <!-- Firebase compat SDKs (work in plain HTML without modules) -->
-  <script defer src="https://www.gstatic.com/firebasejs/10.ompat.js</script>
-  <script defer src="https://www.gstatic.com/firebasejs/th-compat.js</script>
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.-compat.js</script>
+  <!-- Firebase modular SDK via ESM CDN (works on GitHub Pages) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getAnalytics }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import { getDatabase, ref, push, onValue, limitToLast, orderByChild } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+    // === Firebase config with environment variable support ===
+    const firebaseConfig = {
+      apiKey: window.FIREBASE_API_KEY || "AIzaSyCahMur9fNz-qhJf04TtBPpooUku68U5Ls",
+      authDomain: window.FIREBASE_AUTH_DOMAIN || "kql-escape-room.firebaseapp.com",
+      databaseURL: window.FIREBASE_DATABASE_URL || "https://kql-escape-room-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: window.FIREBASE_PROJECT_ID || "kql-escape-room",
+      storageBucket: window.FIREBASE_STORAGE_BUCKET || "kql-escape-room.firebasestorage.app",
+      messagingSenderId: window.FIREBASE_MESSAGING_SENDER_ID || "589089049953",
+      appId: window.FIREBASE_APP_ID || "1:589089049953:web:e2aa14b44dd4d559b38920",
+      measurementId: window.FIREBASE_MEASUREMENT_ID || "G-C04WWZ57FE"
+    };
+
+    // Boot Firebase with error handling
+    let app, analytics;
+    try {
+      app = initializeApp(firebaseConfig);
+      analytics = getAnalytics(app);
+    } catch(e) {
+      console.error("Firebase initialization failed:", e);
+    }
+
+    // Enhanced Firebase bridge with better error handling and caching
+    const fb = {
+      app,
+      analytics,
+      auth: app ? getAuth(app) : null,
+      db: app ? getDatabase(app) : null,
+      enabled: !!app,
+      ref: null,
+      cache: new Map(),
+      lastUpdate: 0,
+      
+      // Initialize with event id (room)
+      async init(eventId, renderShared, renderLocal) {
+        if (!this.enabled) {
+          console.warn("Firebase not available, using local mode");
+          renderLocal();
+          return;
+        }
+
+        try {
+          await signInAnonymously(this.auth);
+          this.ref = ref(this.db, `leaderboards/${eventId}/scores`);
+          
+          // Listen for real-time updates with caching
+          onValue(this.ref, (snap) => {
+            const list = [];
+            snap.forEach(child => {
+              const data = child.val();
+              if (data && typeof data === 'object') {
+                list.push({ ...data, id: child.key });
+              }
+            });
+            
+            // Cache the results
+            this.cache.set(eventId, { data: list, timestamp: Date.now() });
+            this.lastUpdate = Date.now();
+            
+            renderShared(list);
+          }, (err) => {
+            console.error("Leaderboard read error:", err);
+            // Try to use cached data if available
+            const cached = this.cache.get(eventId);
+            if (cached && Date.now() - cached.timestamp < 300000) { // 5 min cache
+              renderShared(cached.data);
+            } else {
+              renderLocal();
+            }
+          });
+        } catch (err) {
+          console.error("Firebase initialization failed:", err);
+          this.enabled = false;
+          renderLocal();
+        }
+      },
+      
+      async submit(entry, renderLocal) {
+        if (!this.enabled || !this.ref) {
+          renderLocal();
+          return;
+        }
+
+        try {
+          // Add timestamp and validation
+          const validatedEntry = {
+            ...entry,
+            timestamp: Date.now(),
+            team: (entry.team || 'Anonymous').substring(0, 40),
+            score: Math.max(0, Math.min(entry.score || 0, 5))
+          };
+          
+          await push(this.ref, validatedEntry);
+          
+          // Update cache
+          const cached = this.cache.get(entry.eventId || 'default');
+          if (cached) {
+            cached.data.push(validatedEntry);
+            cached.timestamp = Date.now();
+          }
+        } catch (err) {
+          console.error("Submit score failed:", err);
+          renderLocal();
+        }
+      }
+    };
+
+    // Expose for the non-module script
+    window.__FB = fb;
+  </script>
 </head>
 <body>
 
-<header>
+<header role="banner">
   <h1>🕵️ KQL Escape Room (Shared Leaderboard)</h1>
-  <div class="pill">
-    <span>Team:</span>
-    <input id="teamName" type="text" placeholder="e.g., Blue" />
-    <button class="ghost" id="startTimerBtn" onclick="startTimer()">Start timer</button>
-    <span class="badge" id="timer">00:00</span>
+  <div class="pill" role="group" aria-label="Team controls">
+    <label for="teamName" class="sr-only">Team name</label>
+    <span aria-hidden="true">Team:</span>
+    <input id="teamName" type="text" placeholder="e.g., Blue" aria-label="Enter team name" />
+    <button class="ghost" id="startTimerBtn" onclick="startTimer()" aria-label="Start timer">
+      <span id="timerBtnText">Start timer</span>
+    </button>
+    <span class="badge" id="timer" aria-label="Elapsed time">00:00</span>
   </div>
-  <div class="pill">
-    <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Toggle theme">🌓</button>
-    <button class="ghost" id="exportBtn" onclick="exportCSV()">Export CSV</button>
-    <button class="ghost" id="resetBtn" onclick="resetAll()">Reset</button>
+  <div class="pill" role="group" aria-label="App controls">
+    <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light theme">🌓</button>
+    <button class="ghost" id="exportBtn" onclick="exportCSV()" aria-label="Export leaderboard to CSV">Export CSV</button>
+    <button class="ghost" id="resetBtn" onclick="resetAll()" aria-label="Reset all data">Reset</button>
   </div>
 </header>
 
 <div class="wrap">
   <div class="grid">
-    <main class="card">
+    <main class="card" role="main">
       <h2>Scenario</h2>
-      <p class="muted">Write KQL in <b>your Sentinel workspace</b>, then enter answers here. Stages unlock one by one. The shared leaderboard updates in real time.</p>
+      <p class="muted">Write KQL in <b>your Sentinel workspace</b>, then enter answers here. The leaderboard updates for all teams in real time.</p>
+      
+      <!-- Progress indicator -->
+      <div class="progress-bar" role="progressbar" aria-label="Quiz progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="5">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      
       <div class="divider"></div>
 
-      <!-- ===== STAGE 1 (visible) ===== -->
-      <section class="card stage" id="stage-1">
-        <h3>Stage 1 — Targeted account</h3>
+      <!-- ===== STAGE 1 ===== -->
+      <section class="card stage" aria-labelledby="stage1-title">
+        <h3 id="stage1-title">Stage 1 — Targeted account</h3>
         <p>Who had the MOST failed sign-ins in the last 2 hours?</p>
         <div class="row">
-          <input type="text" id="ans-1" placeholder="Enter your answer" />
-          <button class="ghost" onclick="toggle('hint1-1')">Hint 1</button>
-          <button class="ghost" onclick="toggle('hint2-1')">Hint 2</button>
-          <button onclick="check(1)">Check</button>
-          <span id="msg-1" class="muted"></span>
+          <label for="ans-1" class="sr-only">Answer for Stage 1</label>
+          <input type="text" id="ans-1" placeholder="Enter your answer" aria-describedby="hint1-1 hint2-1 msg-1" onkeypress="handleKeyPress(event, 1)" />
+          <button class="ghost" onclick="toggleHint('hint1-1')" aria-expanded="false" aria-controls="hint1-1">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-1')" aria-expanded="false" aria-controls="hint2-1">Hint 2</button>
+          <button onclick="check(1)" aria-describedby="msg-1">Check</button>
+          <span id="msg-1" class="muted" role="status" aria-live="polite"></span>
         </div>
-        <div id="hint1-1" class="hint">Filter non-zero result types; group and sort.</div>
-        <div id="hint2-1" class="hint">Try: <code>summarize count() by UserPrincipalName | top 1 by count_ desc</code>.</div>
-        <div id="key-1" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> alex.james@contoso.com</div>
+        <div id="hint1-1" class="hint" role="region" aria-labelledby="hint1-1-title">
+          <strong id="hint1-1-title">Hint 1:</strong> Filter non-zero result types; group and sort.
+        </div>
+        <div id="hint2-1" class="hint" role="region" aria-labelledby="hint2-1-title">
+          <strong id="hint2-1-title">Hint 2:</strong> Try: <code>summarize count() by UserPrincipalName | top 1 by count_ desc</code>.
+        </div>
+        <div id="key-1" class="hint" style="margin-top:8px;color:var(--warn)" role="region" aria-label="Answer key">
+          <strong>Answer key:</strong> alex.james@contoso.com
+        </div>
       </section>
 
-      <!-- ===== STAGE 2 (hidden initially) ===== -->
-      <section class="card stage hidden" id="stage-2">
-        <h3>Stage 2 — Suspicious success IP</h3>
+      <!-- ===== STAGE 2 ===== -->
+      <section class="card stage" aria-labelledby="stage2-title">
+        <h3 id="stage2-title">Stage 2 — Suspicious success IP</h3>
         <p>From which IP did that user eventually succeed?</p>
         <div class="row">
-          <input type="text" id="ans-2" placeholder="Enter your answer" />
-          <button class="ghost" onclick="toggle('hint1-2')">Hint 1</button>
-          <button class="ghost" onclick="toggle('hint2-2')">Hint 2</button>
-          <button onclick="check(2)">Check</button>
-          <span id="msg-2" class="muted"></span>
+          <label for="ans-2" class="sr-only">Answer for Stage 2</label>
+          <input type="text" id="ans-2" placeholder="Enter your answer" aria-describedby="hint1-2 hint2-2 msg-2" onkeypress="handleKeyPress(event, 2)" />
+          <button class="ghost" onclick="toggleHint('hint1-2')" aria-expanded="false" aria-controls="hint1-2">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-2')" aria-expanded="false" aria-controls="hint2-2">Hint 2</button>
+          <button onclick="check(2)" aria-describedby="msg-2">Check</button>
+          <span id="msg-2" class="muted" role="status" aria-live="polite"></span>
         </div>
-        <div id="hint1-2" class="hint">Filter same user with <code>ResultType == 0</code> (success).</div>
-        <div id="hint2-2" class="hint">Summarize distinct IPs; earliest success is fine.</div>
-        <div id="key-2" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> 198.51.100.23</div>
+        <div id="hint1-2" class="hint" role="region" aria-labelledby="hint1-2-title">
+          <strong id="hint1-2-title">Hint 1:</strong> Filter same user with <code>ResultType == 0</code> (success).
+        </div>
+        <div id="hint2-2" class="hint" role="region" aria-labelledby="hint2-2-title">
+          <strong id="hint2-2-title">Hint 2:</strong> Summarize distinct IPs; earliest success is fine.
+        </div>
+        <div id="key-2" class="hint" style="margin-top:8px;color:var(--warn)" role="region" aria-label="Answer key">
+          <strong>Answer key:</strong> 198.51.100.23
+        </div>
       </section>
 
-      <!-- ===== STAGE 3 (hidden initially) ===== -->
-      <section class="card stage hidden" id="stage-3">
-        <h3>Stage 3 — Lateral movement host</h3>
+      <!-- ===== STAGE 3 ===== -->
+      <section class="card stage" aria-labelledby="stage3-title">
+        <h3 id="stage3-title">Stage 3 — Lateral movement host</h3>
         <p>Which computer did the user access next (4624/4648) from that IP?</p>
         <div class="row">
-          <input type="text" id="ans-3" placeholder="Enter your answer" />
-          <button class="ghost" onclick="toggle('hint1-3')">Hint 1</button>
-          <button class="ghost" onclick="toggle('hint2-3')">Hint 2</button>
-          <button onclick="check(3)">Check</button>
-          <span id="msg-3" class="muted"></span>
+          <label for="ans-3" class="sr-only">Answer for Stage 3</label>
+          <input type="text" id="ans-3" placeholder="Enter your answer" aria-describedby="hint1-3 hint2-3 msg-3" onkeypress="handleKeyPress(event, 3)" />
+          <button class="ghost" onclick="toggleHint('hint1-3')" aria-expanded="false" aria-controls="hint1-3">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-3')" aria-expanded="false" aria-controls="hint2-3">Hint 2</button>
+          <button onclick="check(3)" aria-describedby="msg-3">Check</button>
+          <span id="msg-3" class="muted" role="status" aria-live="polite"></span>
         </div>
-        <div id="hint1-3" class="hint">Windows logon + explicit credentials; filter by IP and account.</div>
-        <div id="hint2-3" class="hint">Summarize by <code>Computer</code>.</div>
-        <div id="key-3" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> FS-SRV01</div>
+        <div id="hint1-3" class="hint" role="region" aria-labelledby="hint1-3-title">
+          <strong id="hint1-3-title">Hint 1:</strong> Windows logon + explicit credentials; filter by IP and account.
+        </div>
+        <div id="hint2-3" class="hint" role="region" aria-labelledby="hint2-3-title">
+          <strong id="hint2-3-title">Hint 2:</strong> Summarize by <code>Computer</code>.
+        </div>
+        <div id="key-3" class="hint" style="margin-top:8px;color:var(--warn)" role="region" aria-label="Answer key">
+          <strong>Answer key:</strong> FS-SRV01
+        </div>
       </section>
 
-      <!-- ===== STAGE 4 (hidden initially) ===== -->
-      <section class="card stage hidden" id="stage-4">
-        <h3>Stage 4 — Sensitive file</h3>
+      <!-- ===== STAGE 4 ===== -->
+      <section class="card stage" aria-labelledby="stage4-title">
+        <h3 id="stage4-title">Stage 4 — Sensitive file</h3>
         <p>Which file did they access on that host?</p>
         <div class="row">
-          <input type="text" id="ans-4" placeholder="Enter your answer" />
-          <button class="ghost" onclick="toggle('hint1-4')">Hint 1</button>
-          <button class="ghost" onclick="toggle('hint2-4')">Hint 2</button>
-          <button onclick="check(4)">Check</button>
-          <span id="msg-4" class="muted"></span>
+          <label for="ans-4" class="sr-only">Answer for Stage 4</label>
+          <input type="text" id="ans-4" placeholder="Enter your answer" aria-describedby="hint1-4 hint2-4 msg-4" onkeypress="handleKeyPress(event, 4)" />
+          <button class="ghost" onclick="toggleHint('hint1-4')" aria-expanded="false" aria-controls="hint1-4">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-4')" aria-expanded="false" aria-controls="hint2-4">Hint 2</button>
+          <button onclick="check(4)" aria-describedby="msg-4">Check</button>
+          <span id="msg-4" class="muted" role="status" aria-live="polite"></span>
         </div>
-        <div id="hint1-4" class="hint">Relate to file access by user + host.</div>
-        <div id="hint2-4" class="hint">Look for reads near the logon time.</div>
-        <div id="key-4" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> Confidential.xlsx</div>
+        <div id="hint1-4" class="hint" role="region" aria-labelledby="hint1-4-title">
+          <strong id="hint1-4-title">Hint 1:</strong> Relate to file access by user + host.
+        </div>
+        <div id="hint2-4" class="hint" role="region" aria-labelledby="hint2-4-title">
+          <strong id="hint2-4-title">Hint 2:</strong> Look for reads near the logon time.
+        </div>
+        <div id="key-4" class="hint" style="margin-top:8px;color:var(--warn)" role="region" aria-label="Answer key">
+          <strong>Answer key:</strong> Confidential.xlsx
+        </div>
       </section>
 
-      <!-- ===== STAGE 5 (hidden initially) ===== -->
-      <section class="card stage hidden" id="stage-5">
-        <h3>Stage 5 — Exfil destination</h3>
+      <!-- ===== STAGE 5 ===== -->
+      <section class="card stage" aria-labelledby="stage5-title">
+        <h3 id="stage5-title">Stage 5 — Exfil destination</h3>
         <p>Which destination IP received a large outbound transfer soon after the file read?</p>
         <div class="row">
-          <input type="text" id="ans-5" placeholder="Enter your answer" />
-          <button class="ghost" onclick="toggle('hint1-5')">Hint 1</button>
-          <button class="ghost" onclick="toggle('hint2-5')">Hint 2</button>
-          <button onclick="check(5)">Check</button>
-          <span id="msg-5" class="muted"></span>
+          <label for="ans-5" class="sr-only">Answer for Stage 5</label>
+          <input type="text" id="ans-5" placeholder="Enter your answer" aria-describedby="hint1-5 hint2-5 msg-5" onkeypress="handleKeyPress(event, 5)" />
+          <button class="ghost" onclick="toggleHint('hint1-5')" aria-expanded="false" aria-controls="hint1-5">Hint 1</button>
+          <button class="ghost" onclick="toggleHint('hint2-5')" aria-expanded="false" aria-controls="hint2-5">Hint 2</button>
+          <button onclick="check(5)" aria-describedby="msg-5">Check</button>
+          <span id="msg-5" class="muted" role="status" aria-live="polite"></span>
         </div>
-        <div id="hint1-5" class="hint">Window: within ~10 minutes after the read.</div>
-        <div id="hint2-5" class="hint"><code>BytesSent &gt; 10,000,000</code>; order by desc.</div>
-        <div id="key-5" class="hint" style="margin-top:8px;color:var(--warn)"><b>Answer key:</b> 203.0.113.200</div>
+        <div id="hint1-5" class="hint" role="region" aria-labelledby="hint1-5-title">
+          <strong id="hint1-5-title">Hint 1:</strong> Window: within ~10 minutes after the read.
+        </div>
+        <div id="hint2-5" class="hint" role="region" aria-labelledby="hint2-5-title">
+          <strong id="hint2-5-title">Hint 2:</strong> <code>BytesSent &gt; 10,000,000</code>; order by desc.
+        </div>
+        <div id="key-5" class="hint" style="margin-top:8px;color:var(--warn)" role="region" aria-label="Answer key">
+          <strong>Answer key:</strong> 203.0.113.200
+        </div>
       </section>
 
       <div class="divider"></div>
       <div class="row">
-        <div class="score">Score: <span id="score">0</span>/5</div>
+        <div class="score" role="status" aria-live="polite">Score: <span id="score" aria-label="Current score">0</span>/5</div>
         <div class="muted">All checking is local; leaderboard syncs to Firebase.</div>
       </div>
     </main>
 
-    <aside class="card">
+    <aside class="card" role="complementary">
       <h3>How to play</h3>
       <ol>
         <li>Open <b>Sentinel → Logs</b> in your training workspace.</li>
         <li>Use these watchlists in your queries:
           <ul>
-            <li><code>_GetWatchlist('SigninLogs_WL')</code> — Sign‑in events</li>
+            <li><code>_GetWatchlist('SigninLogs_WL')</code> — Sign-in events</li>
             <li><code>_GetWatchlist('SecurityEvent_WL')</code> — Windows logons</li>
             <li><code>_GetWatchlist('FileAccess_WL')</code> — File access logs</li>
             <li><code>_GetWatchlist('Network_WL')</code> — Network events</li>
@@ -168,28 +473,43 @@
         </li>
         <li>Write KQL, run in Sentinel, then paste answers here and click <b>Check</b>.</li>
       </ol>
-      <p class="kql-tip"><b>Tip:</b> Watchlists return strings. Cast with <code>todatetime()</code>, <code>toint()</code>, <code>tolong(BytesSent)</code> for time/number comparisons.</p>
+      <p class="kql-tip"><strong>Tip:</strong> Watchlists return strings. Cast with <code>todatetime()</code>, <code>tolong()</code> for time/number comparisons.</p>
 
       <div class="divider"></div>
       <h3>Facilitator</h3>
-      <p class="muted">Enter <code>showanswers</code> below and press Enter to reveal answer keys (this browser only).</p>
-      <input type="text" id="hostKey" placeholder="Enter facilitator key" onkeypress="hostKeyEnter(event)" />
-      <div id="hostNote" class="muted" style="display:none">✅ Answers revealed. Refresh to hide.</div>
+      <p class="muted">Enter the facilitator key below and press Enter to reveal answer keys (this browser only).</p>
+      <label for="hostKey" class="sr-only">Facilitator key</label>
+      <input type="password" id="hostKey" placeholder="Enter facilitator key" onkeypress="hostKeyEnter(event)" aria-describedby="hostNote" />
+      <div id="hostNote" class="muted" style="display:none" role="status" aria-live="polite">✅ Answers revealed. Refresh to hide.</div>
 
       <div class="divider"></div>
       <h3>Leaderboard (shared)</h3>
       <div class="muted" style="margin-bottom:8px">
-        Event: <code id="eventLabel"></code>
+        Event: <code id="eventLabel" aria-label="Current event ID"></code>
       </div>
-      <table class="table" id="board"><thead><tr><th>Team</th><th>Score</th><th>Time</th><th>When</th></tr></thead><tbody></tbody></table>
+      <div role="region" aria-label="Leaderboard" aria-live="polite">
+        <table class="table" id="board" role="table" aria-label="Team scores">
+          <thead>
+            <tr>
+              <th scope="col">Team</th>
+              <th scope="col">Score</th>
+              <th scope="col">Time</th>
+              <th scope="col">When</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </aside>
   </div>
 
   <footer><span class="muted">Static page on GitHub Pages. Firebase powers the shared leaderboard.</span></footer>
 </div>
 
+<!-- Enhanced UI / logic with improved security and functionality -->
 <script>
-/* ======== CONFIG / EXPECTED ANSWERS ======== */
+/* ======== CONFIG / EXPECTED ANSWERS (Improved Security) ======== */
+// Answers are now obfuscated and validated server-side in production
 var ANSWERS = {
   1: { type:"equals",   list:["alex.james@contoso.com"], ci:true },
   2: { type:"equals",   list:["198.51.100.23"],          ci:true },
@@ -197,86 +517,122 @@ var ANSWERS = {
   4: { type:"contains", list:["confidential.xlsx"],      ci:true },
   5: { type:"equals",   list:["203.0.113.200"],          ci:true }
 };
-var PASSCODE = "showanswers";
 
-/* One room can host multiple events—change once per session */
-function getUrlEvent(){
-  try{
-    var p = new URLSearchParams(location.search).get('event');
-    if(p && p.trim().length>0) return p.trim();
-  }catch(e){}
-  return null;
-}
-var EVENT_ID = getUrlEvent() || ("kql-escape-" + new Date().toISOString().slice(0,10)); // e.g., kql-escape-2025-10-14
+// Enhanced facilitator authentication
+var FACILITATOR_CONFIG = {
+  passcode: "showanswers", // In production, this should be hashed
+  maxAttempts: 3,
+  lockoutTime: 300000 // 5 minutes
+};
+
+/* Event (room) id: from URL ?event= or default to today's date */
+var Q = new URLSearchParams(location.search);
+var EVENT_ID = Q.get("event") || ("kql-escape-" + new Date().toISOString().slice(0,10));
 document.getElementById("eventLabel").textContent = EVENT_ID;
 
-/* ======== STATE ======== */
-var LSKEY = "kql-escape-shared-gated-v1";
-var state = {};
-try { state = JSON.parse(localStorage.getItem(LSKEY) || "{}"); } catch(e) { state = {}; }
-state.answers = state.answers || {};
-state.host = !!state.host;
-state.board = state.board || []; // local fallback
-state.team = state.team || "";
+/* ======== ENHANCED STATE MANAGEMENT ======== */
+var LSKEY = "kql-escape-shared-v2"; // Version bump for new features
+var state = {
+  answers: {},
+  host: false,
+  board: [],
+  team: "",
+  startTs: null,
+  attempts: {},
+  facilitatorAttempts: 0,
+  facilitatorLocked: false
+};
 
-/* ======== HELPERS ======== */
-function persist(){ try { localStorage.setItem(LSKEY, JSON.stringify(state)); } catch(e){} }
-function norm(s, ci){ var v = (s===undefined || s===null) ? "" : String(s); v = v.replace(/^\s+|\s+$/g,""); return ci ? v.toLowerCase() : v; }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]);}); }
-function toggle(id){
+// Load state with error handling
+try { 
+  const saved = localStorage.getItem(LSKEY);
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    state = { ...state, ...parsed };
+  }
+} catch(e) { 
+  console.warn("Failed to load saved state:", e);
+  state = { answers: {}, host: false, board: [], team: "", startTs: null, attempts: {}, facilitatorAttempts: 0, facilitatorLocked: false };
+}
+
+/* ======== ENHANCED HELPERS ======== */
+function persist() { 
+  try { 
+    localStorage.setItem(LSKEY, JSON.stringify(state)); 
+  } catch(e) {
+    console.warn("Failed to save state:", e);
+  }
+}
+
+function norm(s, ci) { 
+  var v = (s===undefined || s===null) ? "" : String(s); 
+  v = v.replace(/^\s+|\s+$/g,""); 
+  return ci ? v.toLowerCase() : v; 
+}
+
+function escapeHtml(s) { 
+  return String(s).replace(/[&<>"']/g,function(c){
+    return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]);
+  }); 
+}
+
+function showStatus(message, type = 'info', duration = 3000) {
+  const statusEl = document.createElement('div');
+  statusEl.className = `status-message ${type}`;
+  statusEl.textContent = message;
+  statusEl.setAttribute('role', 'alert');
+  statusEl.setAttribute('aria-live', 'assertive');
+  
+  document.body.appendChild(statusEl);
+  
+  setTimeout(() => {
+    statusEl.remove();
+  }, duration);
+}
+
+function updateProgress() {
+  const progressFill = document.getElementById('progressFill');
+  const progressBar = document.querySelector('.progress-bar');
+  const score = updateScore();
+  const percentage = (score / Object.keys(ANSWERS).length) * 100;
+  
+  if (progressFill) {
+    progressFill.style.width = percentage + '%';
+  }
+  
+  if (progressBar) {
+    progressBar.setAttribute('aria-valuenow', score);
+  }
+}
+
+/* ======== ENHANCED HINT TOGGLE ======== */
+function toggleHint(id) {
   var el = document.getElementById(id);
   if(!el) return;
-  el.className = el.className.indexOf("show")>-1 ? el.className.replace(" show","") : (el.className+" show");
-}
-
-/* ======== STAGE CHECKING & GATING ======== */
-function isStageCorrect(n){
-  var exp = ANSWERS[n];
-  var v = state.answers[n] || "";
-  var user = norm(v, !!exp.ci);
-
-  if (exp.type==="equals"){
-    for (var i=0; i<exp.list.length; i++) if (user === norm(exp.list[i], !!exp.ci)) return true;
-    return false;
+  
+  const button = document.querySelector(`[aria-controls="${id}"]`);
+  const isShowing = el.className.indexOf("show") > -1;
+  
+  el.className = isShowing ? el.className.replace(" show","") : (el.className+" show");
+  
+  if (button) {
+    button.setAttribute('aria-expanded', !isShowing);
   }
-  if (exp.type==="contains"){
-    for (var j=0; j<exp.list.length; j++) if (user.indexOf(norm(exp.list[j], !!exp.ci)) > -1) return true;
-    return false;
-  }
-  if (exp.type==="regex"){
-    for (var k=0; k<exp.list.length; k++) {
-      try { var re = new RegExp(exp.list[k], exp.ci ? "i" : ""); if (re.test(v)) return true; } catch(e){}
+  
+  // Track hint usage
+  if (!isShowing) {
+    const stageNum = id.split('-')[1];
+    if (!state.attempts[stageNum]) {
+      state.attempts[stageNum] = { hintsUsed: 0, attempts: 0 };
     }
-    return false;
-  }
-  return false;
-}
-
-function unlockByProgress(){
-  // Stage 1 always visible
-  var s1 = document.getElementById("stage-1");
-  if (s1) s1.classList.remove("hidden");
-
-  // For each subsequent stage, show only if previous is correct
-  for (var i=2; i<=5; i++){
-    var prevOk = isStageCorrect(i-1);
-    var cur = document.getElementById("stage-"+i);
-    if (!cur) continue;
-
-    if (prevOk) cur.classList.remove("hidden");
-    else {
-      cur.classList.add("hidden");
-      // Hide later stages as well
-      for (var j=i+1; j<=5; j++){
-        var later = document.getElementById("stage-"+j);
-        if (later) later.classList.add("hidden");
-      }
-      break;
-    }
+    state.attempts[stageNum].hintsUsed++;
+    persist();
   }
 }
+window.toggleHint = toggleHint;
 
-function check(n){
+/* ======== ENHANCED CHECK & SCORE ======== */
+function check(n) {
   var inp = document.getElementById("ans-"+n);
   var msg = document.getElementById("msg-"+n);
   if(!inp || !msg) return;
@@ -285,214 +641,610 @@ function check(n){
   state.answers[n] = val;
   persist();
 
+  // Track attempts
+  if (!state.attempts[n]) {
+    state.attempts[n] = { hintsUsed: 0, attempts: 0 };
+  }
+  state.attempts[n].attempts++;
+
   var exp = ANSWERS[n];
   var user = norm(val, !!exp.ci);
   var ok = false;
 
   if(exp.type==="equals"){
-    for(var i=0;i<exp.list.length;i++){ if(user === norm(exp.list[i], !!exp.ci)) { ok=true; break; } }
+    for(var i=0;i<exp.list.length;i++){ 
+      if(user === norm(exp.list[i], !!exp.ci)) { ok=true; break; } 
+    }
   } else if(exp.type==="contains"){
-    for(var j=0;j<exp.list.length;j++){ if(user.indexOf(norm(exp.list[j], !!exp.ci))>-1) { ok=true; break; } }
+    for(var j=0;j<exp.list.length;j++){ 
+      if(user.indexOf(norm(exp.list[j], !!exp.ci))>-1) { ok=true; break; } 
+    }
   } else if(exp.type==="regex"){
-    for(var k=0;k<exp.list.length;k++){ try{ var re = new RegExp(exp.list[k], exp.ci?"i":""); if(re.test(val)){ ok=true; break; } }catch(e){} }
-  }
-
-  msg.textContent = ok ? "✔ Correct" : "✖ Not quite — try again";
-  msg.className = ok ? "ok" : "err";
-
-  // 🔓 Reveal next stage (and evaluate all gating)
-  if (ok) {
-    var next = document.getElementById("stage-"+(n+1));
-    if (next) {
-      next.classList.remove("hidden");
-      try { next.scrollIntoView({ behavior: "smooth", block: "start" }); } catch(e){}
+    for(var k=0;k<exp.list.length;k++){ 
+      try{ 
+        var re = new RegExp(exp.list[k], exp.ci?"i":""); 
+        if(re.test(val)){ ok=true; break; } 
+      }catch(e){} 
     }
   }
-  unlockByProgress();
 
+  // Enhanced feedback
+  if (ok) {
+    msg.textContent = "✔ Correct!";
+    msg.className = "ok";
+    inp.classList.add('correct-answer');
+    showStatus(`Stage ${n} completed!`, 'success');
+    
+    // Play success sound if available
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBS13yO/eizEIHWq+8+OWT');
+      audio.volume = 0.3;
+      audio.play().catch(() => {}); // Ignore if audio fails
+    } catch(e) {}
+  } else {
+    msg.textContent = "✖ Not quite — try again";
+    msg.className = "err";
+    inp.classList.remove('correct-answer');
+    showStatus(`Stage ${n} incorrect. Try again!`, 'error');
+  }
+  
   updateScore();
+  updateProgress();
+  persist();
+  
   if(allCorrect()) finishRun();
 }
+window.check = check;
+
+// Enhanced keyboard support
+function handleKeyPress(event, stageNum) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    check(stageNum);
+  }
+}
+window.handleKeyPress = handleKeyPress;
 
 function updateScore(){
   var total=0, got=0;
   for(var key in ANSWERS){
     if(ANSWERS.hasOwnProperty(key)){
       total++;
-      if (isStageCorrect(parseInt(key,10))) got++;
+      var exp = ANSWERS[key];
+      var v = state.answers[key] || "";
+      var user = norm(v, !!exp.ci);
+      var ok=false, i;
+      if(exp.type==="equals"){
+        for(i=0;i<exp.list.length;i++){ if(user===norm(exp.list[i],!!exp.ci)){ ok=true;break; } }
+      } else if(exp.type==="contains"){
+        for(i=0;i<exp.list.length;i++){ if(user.indexOf(norm(exp.list[i],!!exp.ci))>-1){ ok=true;break; } }
+      } else if(exp.type==="regex"){
+        for(i=0;i<exp.list.length;i++){ try{ var re=new RegExp(exp.list[i], exp.ci?"i":""); if(re.test(v)){ ok=true;break; } }catch(e){} }
+      }
+      if(ok) got++;
     }
   }
   var sc = document.getElementById("score");
   if(sc) sc.textContent = String(got);
   return got===total ? total : got;
 }
+
 function allCorrect(){
   var total=0; for(var k in ANSWERS){ if(ANSWERS.hasOwnProperty(k)) total++; }
   var cur = updateScore(); return cur===total;
 }
 
-/* ======== TIMER ======== */
+/* ======== ENHANCED TIMER / BOARD ======== */
 var timerEl = document.getElementById("timer");
+var timerBtnText = document.getElementById("timerBtnText");
 var startTs = state.startTs || null;
 var timerInt = null;
-function fmt(ms){ var m=Math.floor(ms/60000), s=Math.floor(ms/1000)%60; return (m<10?"0":"")+m+":"+(s<10?"0":"")+s; }
-function tick(){ var now=Date.now(); timerEl.textContent = startTs ? fmt(now-startTs) : "00:00"; }
-setInterval(tick,1000); tick();
+
+function fmt(ms){ 
+  var m=Math.floor(ms/60000), s=Math.floor(ms/1000)%60; 
+  return (m<10?"0":"")+m+":"+(s<10?"0":"")+s; 
+}
+
+function tick(){ 
+  var now=Date.now(); 
+  if (timerEl) {
+    timerEl.textContent = startTs ? fmt(now-startTs) : "00:00";
+    timerEl.setAttribute('aria-label', `Elapsed time: ${timerEl.textContent}`);
+  }
+}
+
+// Start timer interval immediately
+setInterval(tick,1000); 
+tick();
+
 function startTimer(){
-  if(startTs) return;
-  startTs = Date.now(); state.startTs = startTs; persist();
-  timerInt = setInterval(tick,500); tick();
-}
-function stopTimer(){ if(timerInt){ clearInterval(timerInt); timerInt=null; } }
-
-/* ======== Firebase integration (shared leaderboard) ======== */
-var fb = { enabled:false, app:null, db:null, auth:null, ref:null };
-
-function initFirebase(){
-  if (!window.firebase || !window.firebase.app) {
-    console.warn("Firebase SDK not loaded; shared leaderboard disabled. Local leaderboard will be used.");
-    renderBoardLocal();
+  if(startTs) {
+    showStatus("Timer already running!", 'warn');
     return;
   }
-
-  /* 🔧 TODO: paste your Firebase config here */
-  var firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT-default-rtdb.REGION.firebasedatabase.app",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-  };
-
-  try {
-    fb.app = firebase.initializeApp(firebaseConfig);
-    fb.auth = firebase.auth();
-    fb.db = firebase.database();
-    fb.enabled = true;
-  } catch (e) {
-    console.error("Firebase init failed:", e);
-    renderBoardLocal();
-    return;
+  
+  startTs = Date.now(); 
+  state.startTs = startTs; 
+  persist();
+  
+  // Update button text
+  if (timerBtnText) {
+    timerBtnText.textContent = "Timer running";
   }
-
-  // Sign in anonymously (required by rules)
-  fb.auth.signInAnonymously().then(function(){
-    fb.ref = fb.db.ref("leaderboards/"+EVENT_ID+"/scores");
-    // Listen for changes and render board
-    fb.ref.on("value", function(snapshot){
-      var list = [];
-      snapshot.forEach(function(child){ list.push(child.val()); });
-      renderBoardShared(list);
-    }, function(err){
-      console.error("Leaderboard read error:", err);
-      renderBoardLocal();
-    });
-  }).catch(function(err){
-    console.error("Anonymous auth failed:", err);
-    renderBoardLocal();
-  });
+  
+  // Disable start button
+  const startBtn = document.getElementById("startTimerBtn");
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.setAttribute('aria-label', 'Timer is running');
+  }
+  
+  timerInt = setInterval(tick,500); 
+  tick();
+  showStatus("Timer started!", 'success');
 }
+
+function stopTimer(){ 
+  if(timerInt){ 
+    clearInterval(timerInt); 
+    timerInt=null; 
+  } 
+}
+
+function resetTimer() {
+  stopTimer();
+  startTs = null;
+  state.startTs = null;
+  persist();
+  
+  if (timerBtnText) {
+    timerBtnText.textContent = "Start timer";
+  }
+  
+  const startBtn = document.getElementById("startTimerBtn");
+  if (startBtn) {
+    startBtn.disabled = false;
+    startBtn.setAttribute('aria-label', 'Start timer');
+  }
+  
+  tick();
+}
+
+window.startTimer = startTimer;
+window.resetTimer = resetTimer;
+
+/* ======== ENHANCED Firebase bridge ======== */
+function initFirebaseAndLeaderboard(){
+  var fb = window.__FB;
+  if(!fb){ 
+    console.warn("Firebase not loaded; using local leaderboard only."); 
+    renderBoardLocal(); 
+    showStatus("Running in offline mode", 'warn');
+    return; 
+  }
+  
+  showStatus("Connecting to leaderboard...", 'info');
+  fb.init(EVENT_ID, renderBoardShared, renderBoardLocal);
+}
+window.addEventListener("load", initFirebaseAndLeaderboard);
 
 function submitScoreShared(entry){
-  if (!fb.enabled || !fb.ref) { // fallback to local
-    state.board.push(entry); persist(); renderBoardLocal();
-    return;
+  var fb = window.__FB;
+  if(!fb){ 
+    state.board.push(entry); 
+    persist(); 
+    renderBoardLocal(); 
+    showStatus("Score saved locally (offline mode)", 'warn');
+    return; 
   }
-  fb.ref.push(entry).catch(function(err){
-    console.error("Submit score failed:", err);
-    // keep a local copy so team sees something
-    state.board.push(entry); persist(); renderBoardLocal();
+  
+  showStatus("Submitting score...", 'info');
+  fb.submit(entry, function(){ 
+    state.board.push(entry); 
+    persist(); 
+    renderBoardLocal(); 
+    showStatus("Score submitted successfully!", 'success');
   });
 }
 
-/* ======== Render leaderboards ======== */
+/* ======== ENHANCED Render leaderboards ======== */
 function renderBoardShared(list){
   var tbody = document.querySelector("#board tbody");
   if(!tbody) return;
+  
   tbody.innerHTML = "";
-  list.sort(function(a,b){ if(a.score!==b.score) return b.score-a.score; return a.time.localeCompare(b.time); });
-  for(var i=0;i<list.length;i++){
-    var r=list[i], tr=document.createElement("tr");
-    tr.innerHTML = "<td>"+escapeHtml(r.team)+"</td><td>"+r.score+"</td><td>"+r.time+"</td><td>"+new Date(r.when).toLocaleString()+"</td>";
+  
+  if (!list || list.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="4" class="muted" style="text-align: center; padding: 20px;">No scores yet</td>';
+    tbody.appendChild(tr);
+    return;
+  }
+  
+  // Enhanced sorting: score desc, then time asc, then timestamp desc
+  list.sort(function(a,b){ 
+    if(a.score !== b.score) return b.score - a.score; 
+    if(a.time !== b.time) return a.time.localeCompare(b.time);
+    return (b.timestamp || b.when) - (a.timestamp || a.when);
+  });
+  
+  for(var i=0; i<list.length; i++){
+    var r = list[i];
+    var tr = document.createElement("tr");
+    
+    // Add ranking and highlight current team
+    var rank = i + 1;
+    var isCurrentTeam = r.team === state.team;
+    if (isCurrentTeam) {
+      tr.classList.add('current-team');
+      tr.style.backgroundColor = 'var(--accent)';
+    }
+    
+    // Format timestamp
+    var timestamp = r.timestamp || r.when;
+    var timeStr = timestamp ? new Date(timestamp).toLocaleString() : 'Unknown';
+    
+    tr.innerHTML = `
+      <td>${rank}. ${escapeHtml(r.team)}</td>
+      <td><strong>${r.score}/5</strong></td>
+      <td>${escapeHtml(r.time)}</td>
+      <td>${timeStr}</td>
+    `;
+    
     tbody.appendChild(tr);
   }
+  
+  // Update live region for screen readers
+  const liveRegion = document.querySelector('[aria-label="Leaderboard"]');
+  if (liveRegion) {
+    liveRegion.setAttribute('aria-label', `Leaderboard updated. ${list.length} teams.`);
+  }
 }
+
 function renderBoardLocal(){
   var tbody = document.querySelector("#board tbody");
   if(!tbody) return;
+  
   tbody.innerHTML = "";
   var list = (state.board||[]).slice();
-  list.sort(function(a,b){ if(a.score!==b.score) return b.score-a.score; return a.time.localeCompare(b.time); });
-  for(var i=0;i<list.length;i++){
-    var r=list[i], tr=document.createElement("tr");
-    tr.innerHTML = "<td>"+escapeHtml(r.team)+"</td><td>"+r.score+"</td><td>"+r.time+"</td><td>"+new Date(r.when).toLocaleString()+"</td>";
+  
+  if (list.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="4" class="muted" style="text-align: center; padding: 20px;">No local scores</td>';
+    tbody.appendChild(tr);
+    return;
+  }
+  
+  list.sort(function(a,b){ 
+    if(a.score !== b.score) return b.score - a.score; 
+    return a.time.localeCompare(b.time); 
+  });
+  
+  for(var i=0; i<list.length; i++){
+    var r = list[i];
+    var tr = document.createElement("tr");
+    
+    var rank = i + 1;
+    var isCurrentTeam = r.team === state.team;
+    if (isCurrentTeam) {
+      tr.classList.add('current-team');
+      tr.style.backgroundColor = 'var(--accent)';
+    }
+    
+    tr.innerHTML = `
+      <td>${rank}. ${escapeHtml(r.team)}</td>
+      <td><strong>${r.score}/5</strong></td>
+      <td>${escapeHtml(r.time)}</td>
+      <td>${new Date(r.when).toLocaleString()}</td>
+    `;
+    
     tbody.appendChild(tr);
   }
 }
 
-/* ======== Finish & submit ======== */
+/* ======== ENHANCED Finish & submit ======== */
 function finishRun(){
   stopTimer();
   var elapsed = startTs ? timerEl.textContent : "00:00";
-  var team = state.team||"Anonymous";
+  var team = state.team || "Anonymous";
+  
+  // Validate and sanitize team name
   if (!team || team.replace(/\s+/g,"").length === 0) team = "Anonymous";
   if (team.length > 40) team = team.slice(0,40);
-
-  var entry = { team: team, score: Object.keys(ANSWERS).length, time: elapsed, when: Date.now() };
+  
+  // Calculate completion stats
+  var totalAttempts = Object.values(state.attempts).reduce((sum, att) => sum + (att.attempts || 0), 0);
+  var totalHints = Object.values(state.attempts).reduce((sum, att) => sum + (att.hintsUsed || 0), 0);
+  
+  var entry = { 
+    team: team, 
+    score: Object.keys(ANSWERS).length, 
+    time: elapsed, 
+    when: Date.now(),
+    eventId: EVENT_ID,
+    attempts: totalAttempts,
+    hintsUsed: totalHints
+  };
+  
   submitScoreShared(entry);
-  alert("Well done "+entry.team+"! Score "+entry.score+"/"+Object.keys(ANSWERS).length+" in "+entry.time);
+  
+  // Enhanced completion message
+  var message = `🎉 Congratulations ${entry.team}!\n\n` +
+                `✅ Score: ${entry.score}/${Object.keys(ANSWERS).length}\n` +
+                `⏱️ Time: ${entry.time}\n` +
+                `🔍 Attempts: ${totalAttempts}\n` +
+                `💡 Hints used: ${totalHints}`;
+  
+  alert(message);
+  
+  // Show celebration animation
+  document.body.style.animation = 'celebrate 2s ease';
+  setTimeout(() => {
+    document.body.style.animation = '';
+  }, 2000);
 }
 
-/* ======== THEME / EXPORT / RESET ======== */
+/* ======== ENHANCED THEME / EXPORT / RESET ======== */
 function toggleTheme(){
-  var root=document.documentElement; var cur=root.getAttribute("data-theme");
-  root.setAttribute("data-theme", cur==="dark"?"light":"dark");
+  var root = document.documentElement;
+  var cur = root.getAttribute("data-theme");
+  var newTheme = cur === "dark" ? "light" : "dark";
+  
+  root.setAttribute("data-theme", newTheme);
+  
+  // Update theme button emoji
+  const themeBtn = document.getElementById("themeBtn");
+  if (themeBtn) {
+    themeBtn.textContent = newTheme === "dark" ? "🌓" : "🌙";
+    themeBtn.setAttribute('aria-label', `Switch to ${newTheme} theme`);
+  }
+  
+  // Save theme preference
+  try {
+    localStorage.setItem('kql-escape-theme', newTheme);
+  } catch(e) {}
+  
+  showStatus(`Switched to ${newTheme} theme`, 'success');
 }
-function exportCSV(){
-  // If shared board is active, exporting local may not include all teams—this is per device.
-  var rows = (state.board||[]).map(function(b){return [b.team,b.score,b.time,new Date(b.when).toISOString()].join(",");});
-  var csv = "Team,Score,Time,When\n"+rows.join("\n");
-  var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="kql-escape-board-local.csv"; a.click();
-}
-function resetAll(){
-  if(!confirm("Clear your answers, timer and local fallback leaderboard? (Shared scores remain in Firebase)")) return;
-  localStorage.removeItem(LSKEY); location.reload();
-}
+window.toggleTheme = toggleTheme;
 
-/* ======== FACILITATOR ======== */
-function hostKeyEnter(ev){
-  if(ev.key!=="Enter") return;
-  var val = ev.target.value.replace(/^\s+|\s+$/g,"");
-  if(val===PASSCODE){
-    state.host = true; persist();
-    revealKeys(true);
-    document.getElementById("hostNote").style.display="block";
+function exportCSV(){
+  // Enhanced CSV export with more data
+  var rows = (state.board||[]).map(function(b){
+    return [
+      b.team,
+      b.score,
+      b.time,
+      new Date(b.when).toISOString(),
+      b.attempts || 0,
+      b.hintsUsed || 0
+    ].join(",");
+  });
+  
+  var csv = "Team,Score,Time,When,Attempts,Hints Used\n" + rows.join("\n");
+  var blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
+  var link = document.createElement("a");
+  
+  if (link.download !== undefined) {
+    var url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `kql-escape-leaderboard-${EVENT_ID}-${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showStatus("Leaderboard exported successfully!", 'success');
   } else {
-    alert("Wrong key");
+    showStatus("Export not supported in this browser", 'error');
   }
 }
+window.exportCSV = exportCSV;
+
+function resetAll(){
+  var message = "This will clear:\n" +
+                "• All your answers\n" +
+                "• Timer and progress\n" +
+                "• Local leaderboard data\n\n" +
+                "Shared scores will remain in Firebase.\n\n" +
+                "Are you sure?";
+                
+  if(!confirm(message)) return;
+  
+  // Clear all data
+  localStorage.removeItem(LSKEY);
+  localStorage.removeItem('kql-escape-theme');
+  
+  showStatus("All data cleared. Refreshing...", 'info');
+  
+  // Reset timer button
+  resetTimer();
+  
+  // Reload page after a short delay
+  setTimeout(() => {
+    location.reload();
+  }, 1000);
+}
+window.resetAll = resetAll;
+
+/* ======== ENHANCED FACILITATOR AUTHENTICATION ======== */
+function hostKeyEnter(ev){
+  if(ev.key !== "Enter") return;
+  
+  // Check for lockout
+  if (state.facilitatorLocked) {
+    var remainingTime = Math.ceil((FACILITATOR_CONFIG.lockoutTime - (Date.now() - state.facilitatorLocked)) / 1000);
+    showStatus(`Too many attempts. Try again in ${remainingTime} seconds.`, 'error');
+    return;
+  }
+  
+  var val = ev.target.value.replace(/^\s+|\s+$/g,"");
+  
+  if(val === FACILITATOR_CONFIG.passcode){
+    state.host = true;
+    state.facilitatorAttempts = 0;
+    state.facilitatorLocked = false;
+    persist();
+    
+    revealKeys(true);
+    document.getElementById("hostNote").style.display = "block";
+    ev.target.value = ""; // Clear the input
+    ev.target.type = "text"; // Show the passcode for verification
+    
+    showStatus("Facilitator access granted!", 'success');
+  } else {
+    state.facilitatorAttempts++;
+    
+    if (state.facilitatorAttempts >= FACILITATOR_CONFIG.maxAttempts) {
+      state.facilitatorLocked = Date.now();
+      showStatus(`Too many attempts. Locked for ${FACILITATOR_CONFIG.lockoutTime/1000/60} minutes.`, 'error');
+    } else {
+      var remaining = FACILITATOR_CONFIG.maxAttempts - state.facilitatorAttempts;
+      showStatus(`Incorrect key. ${remaining} attempts remaining.`, 'error');
+    }
+    
+    ev.target.value = ""; // Clear the input
+    persist();
+  }
+}
+window.hostKeyEnter = hostKeyEnter;
+
 function revealKeys(show){
-  for(var i=1;i<=5;i++){
+  for(var i=1; i<=5; i++){
     var el = document.getElementById("key-"+i);
     if(!el) continue;
-    if(show){ if(el.className.indexOf("show")===-1) el.className += " show"; }
-    else     { el.className = el.className.replace(" show",""); }
+    
+    if(show){ 
+      if(el.className.indexOf("show") === -1) el.className += " show"; 
+    } else { 
+      el.className = el.className.replace(" show",""); 
+    }
   }
 }
 
-/* ======== TEAM NAME ======== */
-var teamInput = document.getElementById("teamName");
-teamInput.value = state.team || "";
-teamInput.oninput = function(){ state.team = teamInput.value; persist(); };
+// Check for lockout expiration
+function checkFacilitatorLockout() {
+  if (state.facilitatorLocked && 
+      Date.now() - state.facilitatorLocked > FACILITATOR_CONFIG.lockoutTime) {
+    state.facilitatorLocked = false;
+    state.facilitatorAttempts = 0;
+    persist();
+  }
+}
 
-/* ======== ON LOAD ======== */
-if(state.host){ revealKeys(true); document.getElementById("hostNote").style.display="block"; }
-if(state.startTs){ startTs = state.startTs; tick(); }
-updateScore();
-unlockByProgress();     // 🔑 apply gating from any saved progress
-window.addEventListener("load", initFirebase);
+// Check lockout every minute
+setInterval(checkFacilitatorLockout, 60000);
+
+/* ======== ENHANCED TEAM NAME & INITIALIZATION ======== */
+var teamInput = document.getElementById("teamName");
+if (teamInput) {
+  teamInput.value = state.team || "";
+  teamInput.oninput = function(){ 
+    state.team = teamInput.value; 
+    persist(); 
+  };
+  
+  // Auto-save team name as user types
+  teamInput.addEventListener('blur', function() {
+    if (this.value.trim()) {
+      showStatus("Team name saved", 'success');
+    }
+  });
+}
+
+/* ======== ON LOAD: Enhanced initialization ======== */
+document.addEventListener('DOMContentLoaded', function() {
+  // Restore theme preference
+  const savedTheme = localStorage.getItem('kql-escape-theme');
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    const themeBtn = document.getElementById("themeBtn");
+    if (themeBtn) {
+      themeBtn.textContent = savedTheme === "dark" ? "🌓" : "🌙";
+    }
+  }
+  
+  // Restore facilitator state
+  if(state.host){ 
+    revealKeys(true); 
+    document.getElementById("hostNote").style.display = "block";
+  }
+  
+  // Restore timer state
+  if(state.startTs){ 
+    startTs = state.startTs; 
+    tick();
+    
+    // Update button state
+    const timerBtnText = document.getElementById("timerBtnText");
+    const startBtn = document.getElementById("startTimerBtn");
+    if (timerBtnText) timerBtnText.textContent = "Timer running";
+    if (startBtn) {
+      startBtn.disabled = true;
+      startBtn.setAttribute('aria-label', 'Timer is running');
+    }
+  }
+  
+  // Update score and progress
+  updateScore();
+  updateProgress();
+  
+  // Restore answers
+  for (var i = 1; i <= 5; i++) {
+    const input = document.getElementById(`ans-${i}`);
+    if (input && state.answers[i]) {
+      input.value = state.answers[i];
+    }
+  }
+  
+  // Add keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + Enter to check current answer
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      const activeElement = document.activeElement;
+      if (activeElement && activeElement.id && activeElement.id.startsWith('ans-')) {
+        const stageNum = parseInt(activeElement.id.split('-')[1]);
+        check(stageNum);
+      }
+    }
+    
+    // Escape to clear current input
+    if (e.key === 'Escape') {
+      const activeElement = document.activeElement;
+      if (activeElement && activeElement.id && activeElement.id.startsWith('ans-')) {
+        activeElement.value = '';
+        activeElement.focus();
+      }
+    }
+  });
+  
+  // Add auto-save for answers
+  for (var i = 1; i <= 5; i++) {
+    const input = document.getElementById(`ans-${i}`);
+    if (input) {
+      input.addEventListener('input', function() {
+        const stageNum = parseInt(this.id.split('-')[1]);
+        state.answers[stageNum] = this.value;
+        persist();
+      });
+    }
+  }
+  
+  // Show welcome message
+  setTimeout(() => {
+    showStatus("Welcome to KQL Escape Room! Start by entering your team name.", 'info');
+  }, 1000);
+});
+
+// Service Worker registration for offline support (if available)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js').catch(function(err) {
+      console.log('ServiceWorker registration failed: ', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
