@@ -378,7 +378,7 @@
   <div class="pill" role="group" aria-label="App controls">
     <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light theme">🌓</button>
     <button class="ghost" id="exportBtn" onclick="exportCSV()" aria-label="Export leaderboard to CSV">Export CSV</button>
-    <button class="ghost" id="resetBtn" onclick="resetAll()" aria-label="Reset all data">Reset</button>
+    <button class="ghost" id="resetBtn" onclick="resetAllForceReload()" aria-label="Reset all data">Reset</button>
   </div>
 </header>
 
@@ -601,6 +601,9 @@ var state = {
   facilitatorLocked: false
 };
 
+// Flag to prevent auto-saving during reset
+var isResetting = false;
+
 // Load state with error handling
 try { 
   const saved = localStorage.getItem(LSKEY);
@@ -615,6 +618,10 @@ try {
 
 /* ======== ENHANCED HELPERS ======== */
 function persist() { 
+  if (isResetting) {
+    console.log("Skipping persist during reset");
+    return;
+  }
   try { 
     localStorage.setItem(LSKEY, JSON.stringify(state)); 
   } catch(e) {
@@ -1202,12 +1209,22 @@ function resetAll(){
                 
   if(!confirm(message)) return;
   
+  console.log("Starting reset process...");
+  
+  // Set reset flag to prevent auto-saving
+  isResetting = true;
+  
   // Stop timer first
   stopTimer();
   
-  // Clear all localStorage data
-  localStorage.removeItem(LSKEY);
-  localStorage.removeItem('kql-escape-theme');
+  // Clear all localStorage data first
+  try {
+    localStorage.removeItem(LSKEY);
+    localStorage.removeItem('kql-escape-theme');
+    console.log("localStorage cleared");
+  } catch(e) {
+    console.error("Error clearing localStorage:", e);
+  }
   
   // Reset all state variables
   state = {
@@ -1221,14 +1238,23 @@ function resetAll(){
     facilitatorLocked: false
   };
   
+  console.log("State reset to:", state);
+  
+  // Reset timer variables
+  startTs = null;
+  timerInt = null;
+  
   // Reset UI elements
   resetTimer();
   
-  // Clear all answer inputs
+  // Clear all answer inputs and messages
   for (var i = 1; i <= 5; i++) {
     const input = document.getElementById(`ans-${i}`);
     const msg = document.getElementById(`msg-${i}`);
-    if (input) input.value = "";
+    if (input) {
+      input.value = "";
+      input.classList.remove('correct-answer');
+    }
     if (msg) {
       msg.textContent = "";
       msg.className = "muted";
@@ -1237,15 +1263,27 @@ function resetAll(){
   
   // Reset team name input
   const teamInput = document.getElementById("teamName");
-  if (teamInput) teamInput.value = "";
+  if (teamInput) {
+    teamInput.value = "";
+  }
   
   // Reset score display
   const scoreEl = document.getElementById("score");
-  if (scoreEl) scoreEl.textContent = "0";
+  if (scoreEl) {
+    scoreEl.textContent = "0";
+  }
   
   // Reset progress bar
   const progressFill = document.getElementById('progressFill');
-  if (progressFill) progressFill.style.width = "0%";
+  if (progressFill) {
+    progressFill.style.width = "0%";
+  }
+  
+  // Reset progress bar aria attributes
+  const progressBar = document.querySelector('.progress-bar');
+  if (progressBar) {
+    progressBar.setAttribute('aria-valuenow', '0');
+  }
   
   // Reset stage visibility
   updateStageVisibility();
@@ -1256,7 +1294,9 @@ function resetAll(){
   // Hide facilitator keys
   revealKeys(false);
   const hostNote = document.getElementById("hostNote");
-  if (hostNote) hostNote.style.display = "none";
+  if (hostNote) {
+    hostNote.style.display = "none";
+  }
   
   // Clear facilitator input
   const hostKeyInput = document.getElementById("hostKey");
@@ -1265,9 +1305,63 @@ function resetAll(){
     hostKeyInput.type = "password";
   }
   
+  // Force update timer display
+  tick();
+  
+  // Force update score
+  updateScore();
+  
+  // Force update progress
+  updateProgress();
+  
+  console.log("Reset completed successfully");
   showStatus("All data cleared successfully!", 'success');
+  
+  // Clear reset flag
+  isResetting = false;
+  
+  // Additional safety: force reload after a delay if needed
+  setTimeout(() => {
+    // Check if reset actually worked by verifying state
+    const currentState = localStorage.getItem(LSKEY);
+    if (currentState) {
+      console.warn("localStorage still contains data, forcing reload");
+      location.reload();
+    }
+  }, 1000);
+}
+
+// Alternative reset function that forces page reload (more reliable for GitHub Pages)
+function resetAllForceReload(){
+  var message = "This will clear ALL data and reload the page:\n" +
+                "• All your answers\n" +
+                "• Timer and progress\n" +
+                "• Local leaderboard data\n\n" +
+                "Shared scores will remain in Firebase.\n\n" +
+                "Are you sure?";
+                
+  if(!confirm(message)) return;
+  
+  console.log("Starting force reset with reload...");
+  
+  // Clear all localStorage data
+  try {
+    localStorage.removeItem(LSKEY);
+    localStorage.removeItem('kql-escape-theme');
+    console.log("localStorage cleared");
+  } catch(e) {
+    console.error("Error clearing localStorage:", e);
+  }
+  
+  showStatus("Clearing data and reloading...", 'info');
+  
+  // Force reload after a short delay
+  setTimeout(() => {
+    location.reload();
+  }, 500);
 }
 window.resetAll = resetAll;
+window.resetAllForceReload = resetAllForceReload;
 
 /* ======== ENHANCED FACILITATOR AUTHENTICATION ======== */
 function hostKeyEnter(ev){
