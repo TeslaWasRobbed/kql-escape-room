@@ -378,7 +378,7 @@
   <div class="pill" role="group" aria-label="App controls">
     <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light theme">🌓</button>
     <button class="ghost" id="exportBtn" onclick="exportCSV()" aria-label="Export leaderboard to CSV">Export CSV</button>
-    <button class="ghost" id="resetBtn" onclick="nuclearReset()" aria-label="Reset all data">Reset</button>
+    <button class="ghost" id="resetBtn" onclick="simpleReset()" aria-label="Reset all data">Reset</button>
   </div>
 </header>
 
@@ -588,6 +588,32 @@ var Q = new URLSearchParams(location.search);
 var EVENT_ID = Q.get("event") || ("kql-escape-" + new Date().toISOString().slice(0,10));
 document.getElementById("eventLabel").textContent = EVENT_ID;
 
+/* ======== RESET DETECTION (MUST BE FIRST) ======== */
+// Check for reset parameters BEFORE any state loading
+var isResetReload = Q.has('reset');
+var isNuclearReset = Q.has('nuclear');
+
+if (isResetReload || isNuclearReset) {
+  console.log("Reset reload detected, clearing all storage and skipping state restoration");
+  
+  // Clear all storage immediately
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+    console.log("All storage cleared due to reset parameter");
+  } catch(e) {
+    console.error("Error clearing storage:", e);
+  }
+  
+  // Clear the reset parameters from URL
+  if (history.replaceState) {
+    const url = new URL(window.location);
+    url.searchParams.delete('reset');
+    url.searchParams.delete('nuclear');
+    history.replaceState({}, '', url);
+  }
+}
+
 /* ======== ENHANCED STATE MANAGEMENT ======== */
 var LSKEY = "kql-escape-shared-v2"; // Version bump for new features
 var state = {
@@ -604,30 +630,29 @@ var state = {
 // Flag to prevent auto-saving during reset
 var isResetting = false;
 
-// Load state with error handling
-// Check if this is a reset reload
-var isResetReload = Q.has('reset');
-
-if (isResetReload) {
-  console.log("Reset reload detected, skipping state restoration");
-  // Clear the reset parameter from URL
-  if (history.replaceState) {
-    const url = new URL(window.location);
-    url.searchParams.delete('reset');
-    history.replaceState({}, '', url);
-  }
-} else {
+// Load state with error handling (only if not a reset reload)
+if (!isResetReload && !isNuclearReset) {
   try { 
     const saved = localStorage.getItem(LSKEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       state = { ...state, ...parsed };
+      console.log("State loaded from localStorage:", parsed);
     }
   } catch(e) { 
     console.warn("Failed to load saved state:", e);
     state = { answers: {}, host: false, board: [], team: "", startTs: null, attempts: {}, facilitatorAttempts: 0, facilitatorLocked: false };
   }
+} else {
+  console.log("Skipping state restoration due to reset parameters");
 }
+
+// Debug: Log initial state
+console.log("=== PAGE LOAD DEBUG ===");
+console.log("Reset parameters detected:", { isResetReload, isNuclearReset });
+console.log("Initial state:", state);
+console.log("localStorage length:", localStorage.length);
+console.log("========================");
 
 /* ======== ENHANCED HELPERS ======== */
 function persist() { 
@@ -1344,6 +1369,24 @@ function resetAll(){
   }, 1000);
 }
 
+// Simple reset function - just clear and reload
+function simpleReset(){
+  var message = "This will clear ALL data and reload the page.\n\nAre you sure?";
+                
+  if(!confirm(message)) return;
+  
+  console.log("Starting simple reset...");
+  
+  // Clear everything
+  localStorage.clear();
+  sessionStorage.clear();
+  
+  console.log("Storage cleared, reloading...");
+  
+  // Immediate reload
+  window.location.reload(true);
+}
+
 // Nuclear reset function - clears everything possible
 function nuclearReset(){
   var message = "NUCLEAR RESET - This will:\n" +
@@ -1382,18 +1425,6 @@ function nuclearReset(){
     console.log("Executing nuclear reload...");
     window.location.replace(window.location.href.split('?')[0] + '?nuclear=' + Date.now());
   }, 1000);
-}
-
-// Handle nuclear reset parameter
-var isNuclearReset = Q.has('nuclear');
-if (isNuclearReset) {
-  console.log("Nuclear reset detected");
-  // Clear the nuclear parameter
-  if (history.replaceState) {
-    const url = new URL(window.location);
-    url.searchParams.delete('nuclear');
-    history.replaceState({}, '', url);
-  }
 }
 
 // Alternative reset function that forces page reload (more reliable for GitHub Pages)
@@ -1449,6 +1480,7 @@ function resetAllForceReload(){
 window.resetAll = resetAll;
 window.resetAllForceReload = resetAllForceReload;
 window.nuclearReset = nuclearReset;
+window.simpleReset = simpleReset;
 
 // Debug function to check localStorage state
 function debugLocalStorage(){
